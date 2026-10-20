@@ -11,6 +11,7 @@
 
 ```bash
 make up      # Moodle 5.3 + MariaDB 11.4; first start installs Moodle (a few minutes)
+make exelearning  # optional: clone mod_exelearning from GitHub into the container and upgrade
 make demo    # "PDF Export Demo Course": teacher_demo / student_demo, password Demo!2026
 make logs    # follow the container log
 make down    # stop; `make clean` also deletes the volumes

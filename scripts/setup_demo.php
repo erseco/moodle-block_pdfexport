@@ -120,6 +120,13 @@ $url = $generator->create_module('url', ['course' => $course->id, 'section' => 2
 $quiz = $generator->create_module('quiz', ['course' => $course->id, 'section' => 3, 'name' => 'Practice quiz']);
 $h5p = $generator->create_module('h5pactivity', ['course' => $course->id, 'section' => 3,
     'name' => 'Interactive H5P activity', 'intro' => '<p>An interactive activity, available only in Moodle.</p>']);
+// Optional: an eXeLearning package when mod_exelearning is installed (`make exelearning`).
+$exelearning = null;
+if (core_component::get_component_directory('mod_exelearning')) {
+    $exelearning = $generator->create_module('exelearning', ['course' => $course->id, 'section' => 3,
+        'name' => 'eXeLearning activity', 'intro' => '<p>Text pages are exported; interactive iDevices are only named.</p>',
+        'packagefilepath' => __DIR__ . '/../tests/fixtures/actividad-evaluable.elpx']);
+}
 $hidden = $generator->create_module('page', ['course' => $course->id, 'section' => 3, 'name' => 'Draft answers (hidden)',
     'content' => '<p>Not visible to students.</p>', 'visible' => 0]);
 
@@ -127,7 +134,8 @@ $hidden = $generator->create_module('page', ['course' => $course->id, 'section' 
 $record = $generator->create_block('pdfexport', ['parentcontextid' => context_course::instance($course->id)->id,
     'pagetypepattern' => 'course-view-*', 'defaultregion' => 'side-pre', 'defaultweight' => -10]);
 \block_pdfexport\local\publication::save(block_instance('pdfexport', $record), [$page->cmid, $book->cmid,
-    $label->cmid, $resource->cmid, $folder->cmid, $url->cmid, $h5p->cmid, $hidden->cmid]);
+    $label->cmid, $resource->cmid, $folder->cmid, $url->cmid, $h5p->cmid, $hidden->cmid,
+    ...($exelearning ? [$exelearning->cmid] : [])]);
 
 // Screenshot-friendly defaults for the demo users: block drawer open, course index closed, no user tours.
 foreach ([$teacher, $student] as $user) {

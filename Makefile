@@ -10,7 +10,7 @@ PLUGIN := /var/www/html/public/blocks/pdfexport
 PLUGIN_CI := /tmp/ci/bin/moodle-plugin-ci
 
 .DEFAULT_GOAL := help
-.PHONY: help check-docker env up down clean logs shell demo install-deps lint fix test coverage behat \
+.PHONY: help check-docker env up down clean logs shell demo exelearning install-deps lint fix test coverage behat \
 	plugin-ci check-version check-package package
 
 help:
@@ -21,6 +21,7 @@ help:
 	@echo "  logs           - Follow the Moodle container logs"
 	@echo "  shell          - Open a shell in the Moodle container"
 	@echo "  demo           - Create the 'PDF Export Demo Course' in the local Moodle"
+	@echo "  exelearning    - Install mod_exelearning from its GitHub repository (EXELEARNING_REF=main)"
 	@echo "  install-deps   - Install the Composer development tools (moodle-cs)"
 	@echo "  lint           - Moodle coding style (PHPCS, zero errors and warnings)"
 	@echo "  fix            - Fix coding style automatically (PHPCBF)"
@@ -55,6 +56,15 @@ shell: check-docker
 
 demo: check-docker
 	$(EXEC) php $(PLUGIN)/scripts/setup_demo.php
+
+# mod_exelearning is optional: the eXeLearning adapter, its tests and the demo activity
+# use it when it is installed.
+EXELEARNING_REF ?= main
+exelearning: check-docker
+	$(EXEC_ROOT) sh -c 'command -v git >/dev/null || apk add --no-cache git >/dev/null'
+	$(EXEC) sh -c '[ -d public/mod/exelearning ] || git clone -q --depth 1 --branch $(EXELEARNING_REF) \
+		https://github.com/exelearning/moodle-mod_exelearning.git public/mod/exelearning'
+	$(EXEC) php admin/cli/upgrade.php --non-interactive
 
 install-deps:
 	composer install --no-interaction --no-progress

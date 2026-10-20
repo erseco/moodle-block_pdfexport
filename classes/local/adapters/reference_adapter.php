@@ -19,7 +19,7 @@ namespace block_pdfexport\local\adapters;
 use block_pdfexport\local\print_transformer;
 
 /**
- * Describes interactive activities (SCORM, H5P, eXeLearning) that cannot be printed.
+ * Describes interactive activities (SCORM, H5P) that cannot be printed.
  *
  * Only the description and a link to the activity are exported: never attempts, grades,
  * answers or tracking data.

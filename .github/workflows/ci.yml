@@ -102,6 +102,10 @@ jobs:
           sudo locale-gen en_AU.UTF-8
           echo "NVM_DIR=$HOME/.nvm" >> "$GITHUB_ENV"
 
+      - name: Add mod_exelearning
+        # Optional dependency: the eXeLearning adapter's PHPUnit and Behat tests use it.
+        run: moodle-plugin-ci add-plugin exelearning/moodle-mod_exelearning
+
       - name: Install moodle-plugin-ci
         run: moodle-plugin-ci install --plugin ./plugin --db-host=127.0.0.1
         env:
