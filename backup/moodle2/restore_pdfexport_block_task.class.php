@@ -22,8 +22,10 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+use block_pdfexport\local\publication;
+
 /**
- * Remaps the published course module ids after a course restore.
+ * Remaps the published course module ids and attribution overrides after a course restore.
  *
  * @package    block_pdfexport
  * @copyright  2026 HenarLG and block_pdfexport contributors
@@ -72,14 +74,32 @@ class restore_pdfexport_block_task extends restore_block_task {
         }
         $config = $this->decode_configdata($configdata);
         $ids = [];
-        foreach (\block_pdfexport\local\publication::get_selected_cmids($config) as $oldid) {
-            $mapping = restore_dbops::get_backup_ids_record($this->get_restoreid(), 'course_module', $oldid);
-            if ($mapping && $mapping->newitemid) {
-                $ids[] = (int)$mapping->newitemid;
+        foreach (publication::get_selected_cmids($config) as $oldid) {
+            if ($newid = $this->get_new_cmid($oldid)) {
+                $ids[] = $newid;
             }
         }
         $config->selectedcmids = implode(',', $ids);
+        // Resource attribution overrides are keyed by course module id too.
+        $overrides = [];
+        foreach (publication::get_settings($config)['cms'] as $oldid => $settings) {
+            if ($newid = $this->get_new_cmid($oldid)) {
+                $overrides[$newid] = $settings;
+            }
+        }
+        $config->cmattribution = $overrides;
         $DB->set_field('block_instances', 'configdata', base64_encode(serialize($config)), ['id' => $blockid]);
+    }
+
+    /**
+     * Returns the id of the restored course module.
+     *
+     * @param int $oldid Course module id in the backup.
+     * @return int New id, 0 when the module was not restored.
+     */
+    private function get_new_cmid(int $oldid): int {
+        $mapping = restore_dbops::get_backup_ids_record($this->get_restoreid(), 'course_module', $oldid);
+        return $mapping && $mapping->newitemid ? (int)$mapping->newitemid : 0;
     }
 
     /**

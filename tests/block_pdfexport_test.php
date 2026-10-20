@@ -145,6 +145,8 @@ final class block_pdfexport_test extends \advanced_testcase {
         foreach (['addinstance', 'myaddinstance', 'configure', 'view'] as $capability) {
             $this->assertNotEmpty(get_capability_info('block/pdfexport:' . $capability));
         }
+        // No user-linked data: free-text author names cannot be mapped to users to export or delete.
+        $this->assertTrue((new \core_privacy\manager())->component_is_compliant('block_pdfexport'));
         $this->assertSame('privacy:metadata', privacy\provider::get_reason());
         $this->assertNotEmpty(get_string(privacy\provider::get_reason(), 'block_pdfexport'));
     }

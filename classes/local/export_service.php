@@ -46,6 +46,12 @@ final class export_service {
     /** @var int Maximum number of resources in a single PDF. */
     private int $maxresources;
 
+    /** @var array Default attribution, see publication::get_attribution(). */
+    private array $attribution;
+
+    /** @var array[] Attribution of the resources that override the default, keyed by course module id. */
+    private array $cmattributions;
+
     /**
      * Constructor.
      *
@@ -53,17 +59,23 @@ final class export_service {
      * @param int[] $selected Published course module ids.
      * @param print_transformer|null $transformer Transformer (injectable for tests).
      * @param int $maxresources Maximum number of resources in a course PDF.
+     * @param array $attribution Default attribution, see publication::get_attribution().
+     * @param array[] $cmattributions Resource attribution by course module id, see publication::get_cm_attributions().
      */
     public function __construct(
         \stdClass $course,
         array $selected,
         ?print_transformer $transformer = null,
-        int $maxresources = self::MAX_RESOURCES
+        int $maxresources = self::MAX_RESOURCES,
+        array $attribution = [],
+        array $cmattributions = []
     ) {
         $this->course = $course;
         $this->selected = $selected;
         $this->transformer = $transformer ?? new print_transformer();
         $this->maxresources = $maxresources;
+        $this->attribution = $attribution;
+        $this->cmattributions = $cmattributions;
     }
 
     /**
@@ -119,6 +131,7 @@ final class export_service {
             'title' => format_string($this->course->fullname, true, ['context' => $context, 'escape' => false]),
             'subtitle' => format_string($this->course->shortname, true, ['context' => $context, 'escape' => false]),
             'summary' => $this->transformer->transform($summary, $context, 'course', 'summary', null),
+            'attribution' => $this->attribution,
             'sections' => [],
             'warnings' => [],
         ];
@@ -155,6 +168,7 @@ final class export_service {
                             ['context' => \context_course::instance($this->course->id), 'escape' => false]
                         ),
                         'summary' => '',
+                        'attribution' => $item['attribution'],
                         'sections' => [['title' => null, 'items' => [$item]]],
                         'warnings' => [],
                     ]);
@@ -172,14 +186,24 @@ final class export_service {
      * @return string PDF bytes.
      */
     public function render(array $document): string {
-        $pdf = new pdf_document($document['title'], $document['subtitle']);
+        $attribution = $document['attribution'];
+        // Metadata lists every author and license of the document, in order of appearance.
+        $all = [$attribution];
+        foreach ($document['sections'] as $section) {
+            array_push($all, ...array_column($section['items'], 'attribution'));
+        }
+        $licenses = array_unique(array_filter(array_column($all, 'license')));
+        $subject = $document['subtitle'] . ($licenses ? ' | ' . implode('; ', $licenses) : '');
+        $authors = array_unique(array_merge(...array_column($all, 'authors')));
+        $pdf = new pdf_document($document['title'], $subject, implode('; ', $authors));
         $course = $document['type'] === 'course';
         if ($course) {
             $pdf->add_cover(
                 $document['title'],
                 $document['subtitle'],
                 $document['summary'],
-                get_string('generatedon', 'block_pdfexport', userdate(time()))
+                get_string('generatedon', 'block_pdfexport', userdate(time())),
+                $attribution
             );
         }
         foreach ($document['sections'] as $section) {
@@ -188,6 +212,12 @@ final class export_service {
             }
             foreach ($section['items'] as $item) {
                 $pdf->add_heading($item['title'], $course ? 1 : 0);
+                if (!$course) {
+                    $pdf->add_attribution($attribution);
+                } else if ($item['attribution'] !== $attribution) {
+                    // Spell out missing values so the cover attribution is not read as applying here.
+                    $pdf->add_attribution($item['attribution'], true);
+                }
                 foreach ($item['parts'] as $part) {
                     if ($part['title'] !== null) {
                         $pdf->add_heading($part['title'], min(3, $part['level'] + ($course ? 1 : 0)));
@@ -250,6 +280,7 @@ final class export_service {
             'modname' => $cm->modname,
             'title' => $prefix . $cm->get_formatted_name(['escape' => false]),
             'support' => $adapter->get_support_level(),
+            'attribution' => $this->cmattributions[(int)$cm->id] ?? $this->attribution,
             'parts' => $parts,
             'warnings' => $this->transformer->take_warnings(),
         ];

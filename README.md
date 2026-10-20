@@ -27,7 +27,8 @@ Original idea and first implementation by **[HenarLG](https://github.com/HenarLG
   availability restrictions, groups, hidden book chapters and module capabilities.
 - **Safe conversion**: an allowlist of HTML tags and attributes, no JavaScript, no
   remote downloads; images only from the resource's own Moodle files.
-- **Teacher selection page** grouped by section, with "Select all" per section.
+- **Teacher configuration** grouped by section, with "Select all" per section and
+  optional author attribution and content license.
 - English and Spanish translations.
 
 ## Compatibility
@@ -63,8 +64,16 @@ boots Moodle 5.3 in your browser with a demo course (users `teacher_demo` and
 2. In the block, follow **Manage downloadable resources**.
 3. Tick the resources to publish. Each one shows its type and how much of it the PDF
    reproduces (see the table below). Use **Select all** for the whole course or a
-   section, then **Save changes**.
-4. **Download the course PDF with the saved selection** shows what students will get.
+   section.
+4. Optionally, under **Default authorship and license**, enter one author or
+   organization per line and choose a content license: the six Creative Commons 4.0
+   licenses (linked to their official deed) or a custom license with a name and an
+   optional HTTP(S) link. A published resource with other authors or another license
+   gets **Specific authorship and license** under its checkbox: empty authors use the
+   default ones, and its license can be the default, another one or explicitly *No
+   license specified*. Leave everything empty if it is not known: no license is ever
+   assigned automatically. Then **Save changes**.
+5. **Download the course PDF with the saved selection** shows what students will get.
    Hidden or restricted resources you selected are only included for users who can
    see them.
 
@@ -127,9 +136,21 @@ placeholder. Each of these cases adds a line to the *Conversion warnings* page.
   and `..` paths are rejected. Nothing is ever downloaded from the network.
 - Quizzes, assignments, forums and other activities with personal data are not
   exportable, and no attempts, grades, submissions or posts are ever included.
-- The plugin stores only the list of published course modules in the block
-  configuration. It stores no personal data (null privacy provider), and the PDFs are
-  generated on request and are not kept.
+- The plugin stores the published module selection and the optional authorship and
+  license of the content in the block configuration. Author names are free text that
+  credits the content and is not linked to user accounts, so the privacy provider is a
+  null provider (no user data to export or delete). PDFs are generated on request and
+  are not kept.
+
+## Authorship and license
+
+Configured authorship and license are printed under the title of a resource PDF and on
+the cover of the course PDF; in the course PDF, a resource whose authorship or license
+differs from the default shows its own under its heading, with "Not specified" or "No
+license specified" for missing values. The PDF *Author* metadata lists every author
+and the *Subject* metadata adds every license name after the course name. The content
+license is independent of the plugin's GPL license: without configuration, nothing is
+printed and no license is assumed.
 
 ## Limitations
 

@@ -27,7 +27,7 @@ require_once($CFG->dirroot . '/backup/util/includes/restore_includes.php');
 require_once($CFG->dirroot . '/blocks/pdfexport/backup/moodle2/restore_pdfexport_block_task.class.php');
 
 /**
- * Tests that course backup and restore keep the published selection.
+ * Tests that course backup and restore keep the published selection and attribution.
  *
  * @package    block_pdfexport
  * @category   test
@@ -37,7 +37,8 @@ require_once($CFG->dirroot . '/blocks/pdfexport/backup/moodle2/restore_pdfexport
 #[CoversClass(\restore_pdfexport_block_task::class)]
 final class backup_restore_test extends \advanced_testcase {
     /**
-     * The selected course modules are remapped to the restored ones; unknown ids are dropped.
+     * The selected course modules and their attribution overrides are remapped to the restored
+     * ones; unknown ids are dropped.
      */
     public function test_restore_remaps_selection(): void {
         global $CFG, $DB, $USER;
@@ -48,10 +49,21 @@ final class backup_restore_test extends \advanced_testcase {
         $course = $generator->create_course();
         $page = $generator->create_module('page', ['course' => $course->id, 'name' => 'Restored page']);
         $book = $generator->create_module('book', ['course' => $course->id, 'name' => 'Restored book']);
-        $generator->get_plugin_generator('block_pdfexport')->create_course_block(
+        $record = $generator->get_plugin_generator('block_pdfexport')->create_course_block(
             $course,
             [(int)$book->cmid, (int)$page->cmid, 999999]
         );
+        // Default attribution plus overrides keyed by course module id, one of them unknown.
+        $config = unserialize(base64_decode($record->configdata));
+        $config->authors = "Ana\nBob";
+        $config->license = 'cc_by';
+        $config->cmattribution = [
+            $book->cmid => ['authors' => 'Book Author', 'license' => 'custom', 'customlicense' => 'House',
+                'licenseurl' => 'https://example.org/house'],
+            $page->cmid => ['authors' => '', 'license' => ''],
+            999999 => ['authors' => 'Lost', 'license' => 'cc_by_nd'],
+        ];
+        $DB->set_field('block_instances', 'configdata', base64_encode(serialize($config)), ['id' => $record->id]);
 
         $bc = new \backup_controller(
             \backup::TYPE_1COURSE,
@@ -87,5 +99,15 @@ final class backup_restore_test extends \advanced_testcase {
             publication::get_selected_cmids($block->config)
         );
         $this->assertSame(['Restored book', 'Restored page'], $names);
+        $this->assertSame(['authors' => ['Ana', 'Bob'], 'license' => 'CC BY 4.0',
+            'licenseurl' => 'https://creativecommons.org/licenses/by/4.0/'], publication::get_attribution($block->config));
+        $overrides = [];
+        foreach (publication::get_cm_attributions($block->config) as $cmid => $attribution) {
+            $overrides[$modinfo->get_cm($cmid)->name] = $attribution;
+        }
+        $this->assertSame([
+            'Restored book' => ['authors' => ['Book Author'], 'license' => 'House', 'licenseurl' => 'https://example.org/house'],
+            'Restored page' => ['authors' => ['Ana', 'Bob'], 'license' => '', 'licenseurl' => ''],
+        ], $overrides);
     }
 }

@@ -38,7 +38,12 @@ $block = publication::get_course_block($blockid, $course->id);
 core_php_time_limit::raise(300);
 raise_memory_limit(MEMORY_HUGE);
 
-$service = new export_service($course, publication::get_selected_cmids($block->config));
+$service = new export_service(
+    $course,
+    publication::get_selected_cmids($block->config),
+    attribution: publication::get_attribution($block->config),
+    cmattributions: publication::get_cm_attributions($block->config)
+);
 $document = $cmid ? $service->build_module_document($cmid) : $service->build_course_document();
 // The whole PDF is produced before any header is sent, so errors never yield a corrupt download.
 $content = $service->render($document);

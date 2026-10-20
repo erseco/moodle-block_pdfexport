@@ -43,6 +43,57 @@ Feature: Publish course content and download it as PDF
     And the field "Welcome page" matches value "1"
     And the field "Hidden page" matches value "0"
 
+  @javascript
+  Scenario: A teacher sets a default authorship and license and a resource-specific one
+    Given the PDF Export block of "C1" publishes:
+      | Welcome page |
+      | Intro book   |
+    And I log in as "teacher1"
+    And I am on "Course 1" course homepage
+    And I click on "Manage downloadable resources" "link" in the "PDF Export" "block"
+    And I should not see "Custom license name"
+    When I set the following fields to these values:
+      | Authors or organizations | Ana García     |
+      | Content license          | Custom license |
+    And I set the following fields to these values:
+      | Custom license name    | Campus terms              |
+      | License URL (optional) | https://example.org/terms |
+      | Specific authorship and license for Intro book | 1 |
+    And I set the following fields to these values:
+      | Intro book: authors or organizations (empty: default authors) | Book Team |
+      | Intro book: license                                           | CC BY-SA 4.0 |
+    And I press "Save changes"
+    And I click on "Manage downloadable resources" "link" in the "PDF Export" "block"
+    Then the following fields match these values:
+      | Authors or organizations                                       | Ana García                |
+      | Content license                                                | Custom license            |
+      | Custom license name                                            | Campus terms              |
+      | License URL (optional)                                         | https://example.org/terms |
+      | Specific authorship and license for Intro book                 | 1                         |
+      | Intro book: authors or organizations (empty: default authors)  | Book Team                 |
+      | Intro book: license                                            | CC BY-SA 4.0              |
+      | Specific authorship and license for Welcome page               | 0                         |
+    And I should not see "Welcome page: license"
+    And I log out
+    And I log in as "student1"
+    And I am on "Course 1" course homepage
+    And following "Download course PDF" should download between "2000" and "2000000" bytes
+    And following "Download PDF of Intro book" should download between "1000" and "2000000" bytes
+
+  @javascript
+  Scenario: A custom license needs a name and an HTTP(S) URL
+    Given the PDF Export block of "C1" publishes:
+      | Welcome page |
+    And I log in as "teacher1"
+    And I am on "Course 1" course homepage
+    And I click on "Manage downloadable resources" "link" in the "PDF Export" "block"
+    When I set the following fields to these values:
+      | Content license | Custom license |
+    And I set the field "License URL (optional)" to "javascript:alert(1)"
+    And I press "Save changes"
+    Then I should see "Enter a name for the custom license."
+    And I should see "Enter a valid HTTP or HTTPS URL."
+
   Scenario: A student downloads individual and course PDFs of published resources only
     Given the PDF Export block of "C1" publishes:
       | Welcome page |

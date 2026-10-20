@@ -17,7 +17,12 @@ All notable changes to this plugin are documented here. The format follows
   folders (file listing) and URLs; SCORM, H5P and eXeLearning activities exported as a
   description with a link.
 - Selection page grouped by section, with support level per resource and "Select all".
-- Restore support: the published selection follows the restored course modules.
+- Optional authorship and license of the exported content (#5): a block default and
+  per-resource overrides; Creative Commons 4.0 licenses and custom licenses with an
+  optional HTTP(S) link; printed in course and resource PDFs and set in the PDF
+  *Author* and *Subject* metadata. No license is ever assumed.
+- Restore support: the published selection and attribution overrides follow the
+  restored course modules.
 - Null privacy provider.
 - PHPUnit and Behat suites, 90% coverage gate, GitHub Actions CI, release packaging,
   Dependabot, Moodle Playground blueprint and PR previews, documentation and ADRs.

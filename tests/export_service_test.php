@@ -19,6 +19,7 @@ namespace block_pdfexport;
 use block_pdfexport\local\export_service;
 use block_pdfexport\local\pdf_document;
 use block_pdfexport\local\print_transformer;
+use block_pdfexport\local\publication;
 use block_pdfexport\local\resource_detector;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -93,10 +94,16 @@ final class export_service_test extends \advanced_testcase {
      * Returns a service for the current user.
      *
      * @param int[] $selected Selection.
+     * @param \stdClass|null $config Block configuration holding the attribution.
      * @return export_service
      */
-    private function service(array $selected): export_service {
-        return new export_service(get_course($this->course->id), $selected);
+    private function service(array $selected, ?\stdClass $config = null): export_service {
+        return new export_service(
+            get_course($this->course->id),
+            $selected,
+            attribution: $config ? publication::get_attribution($config) : [],
+            cmattributions: publication::get_cm_attributions($config)
+        );
     }
 
     /**
@@ -124,6 +131,61 @@ final class export_service_test extends \advanced_testcase {
      */
     private static function pdf_string(string $text): string {
         return mb_convert_encoding($text, 'UTF-16BE', 'UTF-8');
+    }
+
+    /**
+     * Decodes a PDF literal string as TCPDF writes it: escaped, UTF-16BE with an optional BOM.
+     *
+     * @param string $literal String bytes between the parentheses.
+     * @return string UTF-8 text.
+     */
+    private static function decode_pdf_string(string $literal): string {
+        $bytes = preg_replace_callback('/\\\\([0-7]{1,3}|.)/s', function (array $match): string {
+            $map = ['n' => "\n", 'r' => "\r", 't' => "\t", 'b' => "\x08", 'f' => "\f"];
+            return ctype_digit($match[1]) ? chr(octdec($match[1])) : ($map[$match[1]] ?? $match[1]);
+        }, $literal);
+        return mb_convert_encoding(preg_replace('/^\xFE\xFF/', '', $bytes), 'UTF-8', 'UTF-16BE');
+    }
+
+    /**
+     * Returns one entry of the PDF document information dictionary.
+     *
+     * @param string $pdf PDF bytes.
+     * @param string $key Entry name, such as Author or Subject.
+     * @return string|null UTF-8 value, null when the entry is missing.
+     */
+    private static function pdf_info(string $pdf, string $key): ?string {
+        // The trailer points to the information dictionary; outline entries also have a /Title.
+        preg_match('~/Info (\d+) 0 R~', $pdf, $info);
+        preg_match('~\n' . $info[1] . ' 0 obj\n(.*?)\nendobj~s', $pdf, $object);
+        if (!preg_match('~/' . $key . ' \(((?:\\\\.|[^\\\\)])*)\)~s', $object[1], $match)) {
+            return null;
+        }
+        return self::decode_pdf_string($match[1]);
+    }
+
+    /**
+     * Returns the text drawn on the pages, from the decompressed content streams.
+     *
+     * Unlike searching the raw bytes, this ignores metadata and bookmarks: only what is printed.
+     *
+     * @param string $pdf PDF bytes.
+     * @return string UTF-8 text, with runs of white space collapsed.
+     */
+    private static function page_text(string $pdf): string {
+        preg_match_all('/stream\r?\n(.*?)\r?\nendstream/s', $pdf, $streams);
+        $lines = [];
+        foreach ($streams[1] as $stream) {
+            $content = @gzuncompress($stream);
+            if ($content === false || !str_contains($content, ' Td [(')) {
+                continue;
+            }
+            preg_match_all('/Td \[\(((?:\\\\.|[^\\\\)])*)\)\] TJ/s', $content, $strings);
+            foreach ($strings[1] as $string) {
+                $lines[] = self::decode_pdf_string($string);
+            }
+        }
+        return trim(preg_replace('/\s+/u', ' ', implode(' ', $lines)));
     }
 
     /**
@@ -308,6 +370,7 @@ final class export_service_test extends \advanced_testcase {
         $this->setUser($this->users['student']);
         $service = $this->service($this->ids('welcome', 'book', 'materials', 'links'));
         $document = $service->build_course_document();
+        $this->assertSame([], $document['attribution']);
         $pdf = $service->render($document);
         $this->assertStringStartsWith('%PDF-', $pdf);
         $this->assertStringEndsWith("%%EOF\n", $pdf);
@@ -318,6 +381,122 @@ final class export_service_test extends \advanced_testcase {
         // Cover, TOC and at least one page per section.
         $this->assertGreaterThanOrEqual(4, preg_match_all('~/Type /Page\b~', $pdf));
         $this->assertSame('TECH-101.pdf', $service->get_filename($document));
+    }
+
+    /**
+     * Returns a block configuration with a default attribution and two resource overrides.
+     *
+     * @return \stdClass
+     */
+    private function attribution_config(): \stdClass {
+        return (object)[
+            'authors' => "Ana & Bob\nOrganización «X» 李\nMüller (UPV)",
+            'license' => 'custom',
+            'customlicense' => 'Custom & "Open"',
+            'licenseurl' => 'https://example.org/license?a=1&b=2',
+            'cmattribution' => [
+                $this->cms['book']->cmid => ['authors' => 'Book Writer', 'license' => 'cc_by_sa'],
+                $this->cms['links']->cmid => ['authors' => '', 'license' => ''],
+            ],
+        ];
+    }
+
+    /**
+     * Without attribution, PDFs have no author metadata and print no attribution.
+     */
+    public function test_render_without_attribution(): void {
+        $this->setUser($this->users['student']);
+        $service = $this->service($this->ids('welcome', 'book'), (object)['selectedcmids' => '1']);
+        $document = $service->build_course_document();
+        $this->assertSame(['authors' => [], 'license' => '', 'licenseurl' => ''], $document['attribution']);
+        foreach ([$service->render($document), $service->render($service->build_module_document($this->ids('book')[0]))] as $pdf) {
+            $this->assertNull(self::pdf_info($pdf, 'Author'));
+            $this->assertStringNotContainsString(get_string('authorslabel', 'block_pdfexport'), self::page_text($pdf));
+            $this->assertStringNotContainsString(get_string('licenselabel', 'block_pdfexport'), self::page_text($pdf));
+        }
+        $this->assertSame('TECH 101', self::pdf_info($service->render($document), 'Subject'));
+    }
+
+    /**
+     * A course PDF prints the default on the cover and the resources that differ under their
+     * heading, and its metadata lists every author and license.
+     */
+    public function test_attribution_in_course_pdf(): void {
+        $this->setUser($this->users['student']);
+        $service = $this->service($this->ids('welcome', 'book', 'links'), $this->attribution_config());
+        $document = $service->build_course_document();
+        $default = ['authors' => ['Ana & Bob', 'Organización «X» 李', 'Müller (UPV)'], 'license' => 'Custom & "Open"',
+            'licenseurl' => 'https://example.org/license?a=1&b=2'];
+        $this->assertSame($default, $document['attribution']);
+        $items = array_merge(...array_column($document['sections'], 'items'));
+        $this->assertSame($default, $items[0]['attribution']);
+        $this->assertSame(['authors' => ['Book Writer'], 'license' => 'CC BY-SA 4.0',
+            'licenseurl' => 'https://creativecommons.org/licenses/by-sa/4.0/'], $items[1]['attribution']);
+        $this->assertSame(['authors' => $default['authors'], 'license' => '', 'licenseurl' => ''], $items[2]['attribution']);
+
+        $pdf = $service->render($document);
+        $this->assertSame('Ana & Bob; Organización «X» 李; Müller (UPV); Book Writer', self::pdf_info($pdf, 'Author'));
+        $this->assertSame('TECH 101 | Custom & "Open"; CC BY-SA 4.0', self::pdf_info($pdf, 'Subject'));
+        $this->assertSame('Introduction to Technology', self::pdf_info($pdf, 'Title'));
+        $text = self::page_text($pdf);
+        // Cover (default), book (own) and links (no license, spelled out); the welcome page inherits silently.
+        $this->assertSame(3, substr_count($text, 'Authors:'));
+        $this->assertStringContainsString('Authors: Ana & Bob; Organización «X» 李; Müller (UPV)', $text);
+        $this->assertStringContainsString('License: Custom & "Open"', $text);
+        $this->assertStringContainsString('Authors: Book Writer License: CC BY-SA 4.0', $text);
+        $this->assertStringContainsString('Müller (UPV) License: No license specified', $text);
+        // Links are annotations: their URIs are stored as raw (escaped) bytes.
+        $this->assertStringContainsString('/URI (https://example.org/license?a=1&b=2)', $pdf);
+        $this->assertStringContainsString('/URI (https://creativecommons.org/licenses/by-sa/4.0/)', $pdf);
+    }
+
+    /**
+     * A resource PDF prints and declares the attribution of that resource only.
+     */
+    public function test_attribution_in_module_pdf(): void {
+        $this->setUser($this->users['student']);
+        $service = $this->service($this->ids('welcome', 'book', 'links'), $this->attribution_config());
+
+        $pdf = $service->render($service->build_module_document($this->ids('book')[0]));
+        $this->assertSame('Book Writer', self::pdf_info($pdf, 'Author'));
+        $this->assertSame('Introduction to Technology | CC BY-SA 4.0', self::pdf_info($pdf, 'Subject'));
+        $this->assertStringContainsString('Authors: Book Writer License: CC BY-SA 4.0', self::page_text($pdf));
+        $this->assertStringNotContainsString('Custom', self::page_text($pdf));
+
+        $pdf = $service->render($service->build_module_document($this->ids('welcome')[0]));
+        $this->assertSame('Ana & Bob; Organización «X» 李; Müller (UPV)', self::pdf_info($pdf, 'Author'));
+        $this->assertSame('Introduction to Technology | Custom & "Open"', self::pdf_info($pdf, 'Subject'));
+        $this->assertStringContainsString('License: Custom & "Open"', self::page_text($pdf));
+
+        // An explicit "no license" is not replaced by the default, and nothing is invented.
+        $pdf = $service->render($service->build_module_document($this->ids('links')[0]));
+        $this->assertSame('Introduction to Technology', self::pdf_info($pdf, 'Subject'));
+        $this->assertStringContainsString('Müller (UPV)', self::page_text($pdf));
+        $this->assertStringNotContainsString('License:', self::page_text($pdf));
+    }
+
+    /**
+     * Attribution HTML escapes every value and spells out unknown values only when asked.
+     */
+    public function test_attribution_html(): void {
+        $this->assertSame('', pdf_document::get_attribution_html([]));
+        $this->assertSame('', pdf_document::get_attribution_html(['authors' => [], 'license' => '', 'licenseurl' => '']));
+        $html = pdf_document::get_attribution_html([
+            'authors' => ['<b>Eve</b>', 'O\'Brien & Co'],
+            'license' => '<script>x</script>',
+            'licenseurl' => 'https://example.org/?a=1&b="2"',
+        ]);
+        $this->assertStringContainsString('&lt;b&gt;Eve&lt;/b&gt;; O&#039;Brien &amp; Co', $html);
+        $this->assertStringContainsString('<a href="https://example.org/?a=1&amp;b=&quot;2&quot;">&lt;script&gt;x', $html);
+        $this->assertStringNotContainsString('<script>', $html);
+        $html = pdf_document::get_attribution_html(['authors' => ['Solo']]);
+        $this->assertStringNotContainsString(get_string('licenselabel', 'block_pdfexport'), $html);
+        $html = pdf_document::get_attribution_html(['authors' => [], 'license' => 'CC BY 4.0', 'licenseurl' => ''], true);
+        $this->assertStringContainsString(get_string('authorsnone', 'block_pdfexport'), $html);
+        $this->assertStringContainsString('CC BY 4.0', $html);
+        $this->assertStringNotContainsString('<a ', $html);
+        $html = pdf_document::get_attribution_html([], true);
+        $this->assertStringContainsString(get_string('license_none', 'block_pdfexport'), $html);
     }
 
     /**

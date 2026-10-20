@@ -46,13 +46,17 @@ class pdf_document extends \pdf {
      *
      * @param string $title Document title (metadata and running header).
      * @param string $subject Document subject (metadata).
+     * @param string $author Author names (metadata).
      */
-    public function __construct(string $title, string $subject) {
+    public function __construct(string $title, string $subject, string $author = '') {
         parent::__construct('P', 'mm', 'A4', true, 'UTF-8');
         $this->runningtitle = $title;
         $this->SetCreator(get_string('pluginname', 'block_pdfexport') . ' (Moodle)');
         $this->SetTitle($title);
         $this->SetSubject($subject);
+        if ($author !== '') {
+            $this->SetAuthor($author);
+        }
         $this->SetMargins(18, 22, 18);
         $this->SetHeaderMargin(9);
         $this->SetFooterMargin(12);
@@ -103,13 +107,21 @@ class pdf_document extends \pdf {
      * @param string $subtitle Subtitle (plain text).
      * @param string $summaryhtml Printable HTML summary.
      * @param string $footnote Plain text printed below the summary.
+     * @param array $attribution Default attribution, see add_attribution().
      */
-    public function add_cover(string $title, string $subtitle, string $summaryhtml, string $footnote): void {
+    public function add_cover(
+        string $title,
+        string $subtitle,
+        string $summaryhtml,
+        string $footnote,
+        array $attribution = []
+    ): void {
         $this->oncover = true;
         $this->AddPage();
         $this->SetY(70);
         $this->writeHTML('<h1 style="font-size:26pt;color:' . self::ACCENT . ';text-align:center;">' . s($title) .
             '</h1><p style="font-size:13pt;text-align:center;color:#555555;">' . s($subtitle) . '</p>');
+        $this->add_attribution($attribution);
         if ($summaryhtml !== '') {
             $this->Ln(6);
             $this->writeHTML($summaryhtml);
@@ -119,6 +131,46 @@ class pdf_document extends \pdf {
         // The next page starts the body; reset the flag only once the cover is finished.
         $this->endPage();
         $this->oncover = false;
+    }
+
+    /**
+     * Prints authors and license, when known, as a small centred paragraph.
+     *
+     * @param array $attribution See publication::get_attribution(); missing keys mean unknown.
+     * @param bool $explicit Print unknown values as "not specified" instead of leaving them out.
+     */
+    public function add_attribution(array $attribution, bool $explicit = false): void {
+        $html = self::get_attribution_html($attribution, $explicit);
+        if ($html !== '') {
+            $this->writeHTML($html);
+        }
+    }
+
+    /**
+     * Returns the printable HTML of an attribution; every value is escaped.
+     *
+     * @param array $attribution See add_attribution().
+     * @param bool $explicit See add_attribution().
+     * @return string HTML, empty when there is nothing to print.
+     */
+    public static function get_attribution_html(array $attribution, bool $explicit = false): string {
+        $authors = implode('; ', $attribution['authors'] ?? []);
+        $license = $attribution['license'] ?? '';
+        $url = $attribution['licenseurl'] ?? '';
+        if (!$explicit && $authors === '' && $license === '') {
+            return '';
+        }
+        $lines = [];
+        $label = fn(string $identifier): string => '<strong>' . s(get_string($identifier, 'block_pdfexport')) . ':</strong> ';
+        if ($authors !== '' || $explicit) {
+            $lines[] = $label('authorslabel') . s($authors !== '' ? $authors : get_string('authorsnone', 'block_pdfexport'));
+        }
+        if ($license !== '' && $url !== '') {
+            $lines[] = $label('licenselabel') . '<a href="' . s($url) . '">' . s($license) . '</a>';
+        } else if ($license !== '' || $explicit) {
+            $lines[] = $label('licenselabel') . s($license !== '' ? $license : get_string('license_none', 'block_pdfexport'));
+        }
+        return '<p style="font-size:9pt;text-align:center;color:#555555;">' . implode('<br>', $lines) . '</p>';
     }
 
     /**

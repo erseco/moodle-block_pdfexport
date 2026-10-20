@@ -47,11 +47,12 @@ $PAGE->set_heading(format_string($course->fullname, true, ['context' => $context
 
 $sections = resource_detector::get_sections(get_fast_modinfo($course), false);
 $form = new selection_form($url, ['sections' => $sections,
-    'selected' => publication::get_selected_cmids($block->config)]);
+    'selected' => publication::get_selected_cmids($block->config),
+    'attribution' => publication::get_settings($block->config)]);
 if ($form->is_cancelled()) {
     redirect($courseurl);
 } else if ($data = $form->get_data()) {
-    publication::save($block, $form->get_selected_cmids($data));
+    publication::save($block, $form->get_selected_cmids($data), $form->get_attribution_settings($data));
     redirect($courseurl, get_string('changessaved'), null, \core\output\notification::NOTIFY_SUCCESS);
 }
 
