@@ -8,6 +8,9 @@ services:
     restart: unless-stopped
     environment:
       SITE_URL: ${SITE_URL:-http://localhost}
+      # Moodle compares the request port with SITE_URL; with MOODLE_PORT other than 80,
+      # set REVERSEPROXY=true so the published port is accepted.
+      REVERSEPROXY: ${REVERSEPROXY:-false}
       DB_TYPE: mariadb
       DB_HOST: db
       DB_PORT: 3306

@@ -1,0 +1,42 @@
+# Dependabot for block_pdfexport. Updates run through the same CI gates as any
+# pull request and are never merged automatically.
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Madrid
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+      include: scope
+    labels:
+      - dependencies
+      - github-actions
+
+  # Development tooling only (moodle-cs, PHP_CodeSniffer); nothing ships in the release ZIP.
+  - package-ecosystem: composer
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Madrid
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+      include: scope
+    labels:
+      - dependencies
+      - composer
+    groups:
+      # moodle-cs pins compatible PHP_CodeSniffer releases; update them together.
+      codesniffer:
+        patterns:
+          - "moodlehq/moodle-cs"
+          - "squizlabs/php_codesniffer"

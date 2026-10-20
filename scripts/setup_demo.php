@@ -129,4 +129,12 @@ $record = $generator->create_block('pdfexport', ['parentcontextid' => context_co
 \block_pdfexport\local\publication::save(block_instance('pdfexport', $record), [$page->cmid, $book->cmid,
     $label->cmid, $resource->cmid, $folder->cmid, $url->cmid, $h5p->cmid, $hidden->cmid]);
 
+// Screenshot-friendly defaults for the demo users: block drawer open, course index closed, no user tours.
+foreach ([$teacher, $student] as $user) {
+    set_user_preference('drawer-open-block', 1, $user);
+    set_user_preference('drawer-open-index', 0, $user);
+}
+$DB->set_field('tool_usertours_tours', 'enabled', 0);
+\tool_usertours\cache::notify_tour_change();
+
 mtrace('Created PDFDEMO (course id ' . $course->id . '). Users: teacher_demo / student_demo, password Demo!2026.');

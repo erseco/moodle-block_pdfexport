@@ -1,0 +1,36 @@
+name: PR Playground Preview
+
+# Adds a "Preview in Moodle Playground" button to pull requests. The action
+# reads blueprint.json and points its installMoodlePlugin step at the PR
+# branch archive. It never runs PR code on the runner: the preview runs in the
+# reviewer's browser.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: playground-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  playground-preview:
+    # Fork PRs get a read-only token and cannot update the description.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - uses: ateeducacion/action-moodle-playground-pr-preview@v1
+        with:
+          blueprint-file: blueprint.json
+          mode: append-to-description
+          github-token: ${{ secrets.GITHUB_TOKEN }}
