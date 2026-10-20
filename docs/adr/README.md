@@ -13,6 +13,7 @@ new record supersedes an old one instead of rewriting it.
 | [0005](0005-test-coverage-and-ci.md) | Test coverage and CI strategy | Accepted |
 | [0006](0006-release-and-compatibility.md) | Release and compatibility policy | Accepted |
 | [0007](0007-exelearning-content.md) | eXeLearning content export | Accepted (amends 0002) |
+| [0008](0008-content-attribution.md) | Content authorship and license | Accepted |
 
 Template: Title, Status, Context, Decision, Alternatives considered, Consequences,
 Risks, Validation.

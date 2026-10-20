@@ -17,10 +17,13 @@
 namespace block_pdfexport\privacy;
 
 /**
- * Privacy provider: the block stores no personal data.
+ * Privacy provider: the block stores no personal data linked to Moodle users.
  *
- * The block configuration only holds course module ids. PDFs are generated on request and
- * streamed to the user; nothing is stored or logged by this plugin.
+ * The block configuration holds course module ids and the optional authorship and license
+ * of the published content. Author names are free text typed by teachers to credit the
+ * content, like the text of a page: they are not linked to any user account, so there is
+ * no user data to export or delete. PDFs are generated on request and streamed to the
+ * user; nothing is stored or logged by this plugin.
  *
  * @package    block_pdfexport
  * @copyright  2026 HenarLG and block_pdfexport contributors

@@ -45,6 +45,113 @@ final class publication_test extends \advanced_testcase {
     }
 
     /**
+     * The default attribution is normalised and never infers a license.
+     *
+     * @param mixed $config Block configuration.
+     * @param array $expected Expected attribution.
+     */
+    #[DataProvider('attribution_provider')]
+    public function test_get_attribution($config, array $expected): void {
+        $this->assertSame($expected, publication::get_attribution($config));
+    }
+
+    /**
+     * Default attribution cases.
+     *
+     * @return array
+     */
+    public static function attribution_provider(): array {
+        $none = ['authors' => [], 'license' => '', 'licenseurl' => ''];
+        $custom = ['license' => 'custom', 'customlicense' => 'Custom & "Open"'];
+        return [
+            'null' => [null, $none],
+            'legacy alpha config' => [(object)['selectedcmids' => '1,2'], $none],
+            'non-scalar values' => [(object)['authors' => ['A'], 'license' => ['cc_by'], 'licenseurl' => new \stdClass()], $none],
+            'authors only' => [
+                (object)['authors' => "\n Ana & Bob \r\n\r\nOrganización «X» 李\nAna & Bob\nMüller (UPV)\x07\n"],
+                ['authors' => ['Ana & Bob', 'Organización «X» 李', 'Müller (UPV)'], 'license' => '', 'licenseurl' => ''],
+            ],
+            'unknown license' => [(object)['license' => 'gpl'], $none],
+            'inherit is not a default' => [(object)['license' => 'inherit'], $none],
+            'url without license' => [(object)['licenseurl' => 'https://example.org/'], $none],
+            'stale url on a cc license' => [
+                (object)['license' => 'cc_by', 'licenseurl' => 'https://example.org/other', 'customlicense' => 'Old'],
+                ['authors' => [], 'license' => 'CC BY 4.0', 'licenseurl' => 'https://creativecommons.org/licenses/by/4.0/'],
+            ],
+            'custom license' => [
+                (object)($custom + ['licenseurl' => ' https://example.org/license?a=1&b=2 ']),
+                ['authors' => [], 'license' => 'Custom & "Open"', 'licenseurl' => 'https://example.org/license?a=1&b=2'],
+            ],
+            'custom license without url' => [
+                (object)$custom,
+                ['authors' => [], 'license' => 'Custom & "Open"', 'licenseurl' => ''],
+            ],
+            'javascript url' => [(object)($custom + ['licenseurl' => 'javascript:alert(1)']),
+                ['authors' => [], 'license' => 'Custom & "Open"', 'licenseurl' => '']],
+            'data url' => [(object)($custom + ['licenseurl' => 'data:text/html,x']),
+                ['authors' => [], 'license' => 'Custom & "Open"', 'licenseurl' => '']],
+            'ftp url' => [(object)($custom + ['licenseurl' => 'ftp://example.org/terms']),
+                ['authors' => [], 'license' => 'Custom & "Open"', 'licenseurl' => '']],
+            'relative url' => [(object)($custom + ['licenseurl' => '/terms']),
+                ['authors' => [], 'license' => 'Custom & "Open"', 'licenseurl' => '']],
+            'custom license without name' => [
+                (object)['license' => 'custom', 'customlicense' => ' ', 'licenseurl' => 'https://example.org/'],
+                $none,
+            ],
+        ];
+    }
+
+    /**
+     * Every Creative Commons license gets its own name and official deed, whatever URL is stored.
+     */
+    public function test_creative_commons_licenses(): void {
+        $this->assertCount(6, publication::CC_LICENSES);
+        foreach (publication::CC_LICENSES as $key => $url) {
+            $attribution = publication::get_attribution((object)['license' => $key, 'licenseurl' => 'https://example.org/']);
+            $this->assertSame(get_string('license_' . $key, 'block_pdfexport'), $attribution['license']);
+            $this->assertSame($url, $attribution['licenseurl']);
+            $slug = str_replace(['cc_', '_'], ['', '-'], $key);
+            $this->assertSame('https://creativecommons.org/licenses/' . $slug . '/4.0/', $url);
+            $this->assertStringContainsString(strtoupper($slug), $attribution['license']);
+        }
+    }
+
+    /**
+     * Resource overrides take precedence over the default; empty fields and "inherit" use it,
+     * while an explicit "no license" does not.
+     */
+    public function test_get_cm_attributions(): void {
+        $this->assertSame([], publication::get_cm_attributions(null));
+        $this->assertSame([], publication::get_cm_attributions((object)['selectedcmids' => '1', 'cmattribution' => 'x']));
+        $config = (object)[
+            'authors' => "Default Author\nSchool",
+            'license' => 'cc_by',
+            'cmattribution' => [
+                10 => ['authors' => "Other Author\nÉquipe 李", 'license' => 'cc_by_nc_sa'],
+                11 => ['authors' => '', 'license' => ''],
+                12 => ['authors' => 'Only Authors'],
+                13 => ['authors' => '', 'license' => 'custom', 'customlicense' => 'House rules',
+                    'licenseurl' => 'https://example.org/rules'],
+                14 => ['authors' => '', 'license' => 'inherit'],
+                -1 => ['authors' => 'Negative'],
+                'x' => ['authors' => 'Garbage'],
+                15 => 'not an array',
+            ],
+        ];
+        $cc = ['license' => 'CC BY 4.0', 'licenseurl' => 'https://creativecommons.org/licenses/by/4.0/'];
+        $this->assertSame([
+            10 => ['authors' => ['Other Author', 'Équipe 李'], 'license' => 'CC BY-NC-SA 4.0',
+                'licenseurl' => 'https://creativecommons.org/licenses/by-nc-sa/4.0/'],
+            11 => ['authors' => ['Default Author', 'School'], 'license' => '', 'licenseurl' => ''],
+            12 => ['authors' => ['Only Authors']] + $cc,
+            13 => ['authors' => ['Default Author', 'School'], 'license' => 'House rules',
+                'licenseurl' => 'https://example.org/rules'],
+        ], publication::get_cm_attributions($config));
+        // The default itself is unaffected by the overrides.
+        $this->assertSame(['authors' => ['Default Author', 'School']] + $cc, publication::get_attribution($config));
+    }
+
+    /**
      * Configuration cases.
      *
      * @return array
@@ -77,12 +184,43 @@ final class publication_test extends \advanced_testcase {
 
         $block = publication::get_course_block($record->id, $course->id);
         $this->assertSame([3, 4], publication::get_selected_cmids($block->config));
-        publication::save($block, [8, 8, 9, -1]);
+        $this->assertSame(['authors' => [], 'license' => '', 'licenseurl' => ''], publication::get_attribution($block->config));
+        $this->assertSame([], publication::get_cm_attributions($block->config));
+        publication::save($block, [8, 8, 9, -1], [
+            'default' => [
+                'authors' => "Ada Lovelace\n\nOpen Learning ",
+                'license' => 'custom',
+                'customlicense' => 'Custom terms',
+                'licenseurl' => 'https://example.org/terms',
+            ],
+            'cms' => [
+                8 => ['authors' => '', 'license' => 'cc_by_nd', 'customlicense' => 'Stale', 'licenseurl' => 'https://example.org/'],
+                9 => ['authors' => '', 'license' => 'inherit', 'customlicense' => '', 'licenseurl' => ''],
+            ],
+        ]);
         $this->assertSame([8, 9], publication::get_selected_cmids($block->config));
 
         $reloaded = publication::get_course_block($record->id, $course->id);
         $this->assertSame('8,9', $reloaded->config->selectedcmids);
         $this->assertSame('Mine', $reloaded->config->title);
+        $this->assertSame([
+            'authors' => ['Ada Lovelace', 'Open Learning'],
+            'license' => 'Custom terms',
+            'licenseurl' => 'https://example.org/terms',
+        ], publication::get_attribution($reloaded->config));
+        // Stored normalised: stale custom values are dropped and pure inheritance is not stored.
+        $this->assertSame("Ada Lovelace\nOpen Learning", $reloaded->config->authors);
+        $this->assertSame(
+            [8 => ['authors' => '', 'license' => 'cc_by_nd', 'customlicense' => '', 'licenseurl' => '']],
+            $reloaded->config->cmattribution
+        );
+        $bynd = ['authors' => ['Ada Lovelace', 'Open Learning'], 'license' => 'CC BY-ND 4.0',
+            'licenseurl' => 'https://creativecommons.org/licenses/by-nd/4.0/'];
+        $this->assertSame([8 => $bynd], publication::get_cm_attributions($reloaded->config));
+        // Saving only a selection keeps the attribution.
+        publication::save($reloaded, [9]);
+        $this->assertSame('Custom terms', publication::get_attribution($reloaded->config)['license']);
+        $this->assertCount(1, publication::get_cm_attributions($reloaded->config));
 
         $course2 = $this->getDataGenerator()->create_course();
         $record2 = $generator->create_course_block($course2);
@@ -133,21 +271,68 @@ final class publication_test extends \advanced_testcase {
         $book = $this->getDataGenerator()->create_module('book', ['course' => $course->id, 'section' => 2]);
         $this->getDataGenerator()->create_module('quiz', ['course' => $course->id, 'section' => 2]);
         $sections = resource_detector::get_sections(get_fast_modinfo($course), false);
-        $customdata = ['sections' => $sections, 'selected' => [(int)$book->cmid]];
+        $customdata = [
+            'sections' => $sections,
+            'selected' => [(int)$book->cmid],
+            'attribution' => publication::get_settings((object)['authors' => 'A. Author', 'license' => 'cc_by',
+                'cmattribution' => [$book->cmid => ['authors' => 'Book Author', 'license' => '']]]),
+        ];
 
         $form = new selection_form(null, $customdata);
         $html = $form->render();
         $this->assertStringContainsString('name="cm[' . $page->cmid . ']"', $html);
         $this->assertStringContainsString('name="cm[' . $book->cmid . ']"', $html);
         $this->assertStringContainsString(get_string('support_full', 'block_pdfexport'), $html);
+        $this->assertStringContainsString('name="authors"', $html);
+        $this->assertStringContainsString('name="license"', $html);
+        $this->assertStringContainsString('A. Author', $html);
+        $this->assertStringContainsString('name="cmlicense[' . $page->cmid . ']"', $html);
+        $this->assertStringContainsString('Book Author', $html);
+        $this->assertMatchesRegularExpression('~<option value="cc_by" selected~', $html);
+        $this->assertMatchesRegularExpression('~type="checkbox"\s+name="cmoverride\[' . $book->cmid . '\]"[^>]*checked~', $html);
+        $this->assertDoesNotMatchRegularExpression(
+            '~type="checkbox"\s+name="cmoverride\[' . $page->cmid . '\]"[^>]*checked~',
+            $html
+        );
+        $this->assertMatchesRegularExpression('~<option value="inherit" selected~', $html);
         $this->assertStringNotContainsString('Quiz', $html);
         $this->assertMatchesRegularExpression('~type="checkbox"\s+name="cm\[' . $book->cmid . '\]"[^>]*checked~', $html);
         $this->assertDoesNotMatchRegularExpression('~type="checkbox"\s+name="cm\[' . $page->cmid . '\]"[^>]*checked~', $html);
 
-        selection_form::mock_submit(['cm' => [$page->cmid => 1, $book->cmid => 0, 999999 => 1]]);
+        selection_form::mock_submit([
+            'cm' => [$page->cmid => 1, $book->cmid => 0, 999999 => 1],
+            'authors' => "Ana\nBob",
+            'license' => 'custom',
+            'customlicense' => 'Terms',
+            'licenseurl' => 'https://example.org/terms',
+            'cmoverride' => [$page->cmid => 1, $book->cmid => 0, 999999 => 1],
+            'cmauthors' => [$page->cmid => 'Page Author', $book->cmid => 'Ignored', 999999 => 'Foreign'],
+            'cmlicense' => [$page->cmid => '', $book->cmid => 'cc_by', 999999 => 'cc_by'],
+            'cmcustomlicense' => [$page->cmid => '', $book->cmid => ''],
+            'cmlicenseurl' => [$page->cmid => '', $book->cmid => ''],
+        ]);
         $form = new selection_form(null, $customdata);
         $data = $form->get_data();
         $this->assertSame([(int)$page->cmid], $form->get_selected_cmids($data));
         $this->assertSame([], $form->get_selected_cmids((object)[]));
+        $this->assertSame([
+            'default' => ['authors' => "Ana\nBob", 'license' => 'custom', 'customlicense' => 'Terms',
+                'licenseurl' => 'https://example.org/terms'],
+            'cms' => [(int)$page->cmid => ['authors' => 'Page Author', 'license' => '', 'customlicense' => '', 'licenseurl' => '']],
+        ], $form->get_attribution_settings($data));
+
+        $errors = $form->validation(['license' => 'custom', 'customlicense' => '', 'licenseurl' => 'javascript:alert(1)'], []);
+        $this->assertArrayHasKey('customlicense', $errors);
+        $this->assertArrayHasKey('licenseurl', $errors);
+        // Unused custom fields are not validated: the URL is dropped for other licenses.
+        $this->assertSame([], $form->validation(['license' => 'cc_by', 'licenseurl' => 'javascript:alert(1)'], []));
+        $errors = $form->validation([
+            'license' => '',
+            'cmoverride' => [5 => 1, 6 => 0],
+            'cmlicense' => [5 => 'custom', 6 => 'custom'],
+            'cmcustomlicense' => [5 => '', 6 => ''],
+            'cmlicenseurl' => [5 => 'ftp://example.org', 6 => 'ftp://example.org'],
+        ], []);
+        $this->assertSame(['cmcustomlicense[5]', 'cmlicenseurl[5]'], array_keys($errors));
     }
 }
