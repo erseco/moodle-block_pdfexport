@@ -7,6 +7,9 @@ All notable changes to this plugin are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- eXeLearning activities (mod_exelearning) are exported page by page: page tree from the
+  package navigation, text iDevices printed with their images, interactive iDevices named
+  and omitted without leaking their data (#3).
 - Course PDF: every published resource in course order, grouped by section, with a
   cover, table of contents, bookmarks, running header, page numbers and a conversion
   warnings page.

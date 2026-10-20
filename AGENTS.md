@@ -13,6 +13,9 @@ Supported: Moodle 5.3 LTS only (`version.php`: `requires = 2026100200`,
   `download.php` (PDF). Controllers stay thin; logic lives in `classes/`.
 - `classes/local/export_service.php` is the only export pipeline (course and single
   resource): `resource_detector` → `adapters/*` → `print_transformer` → `pdf_document`.
+- `mod_exelearning` is an optional dependency (`make exelearning`, CI `add-plugin`): the
+  eXeLearning adapter and its tests run only when it is installed. Its fixtures live in
+  `tests/fixtures/` (copied from mod_exelearning).
 - `classes/local/publication.php`: block config (`selectedcmids`, alpha format) and
   block-belongs-to-course validation. Restore remapping: `backup/moodle2/`.
 - Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before structural changes and the

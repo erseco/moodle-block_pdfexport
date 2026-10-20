@@ -79,7 +79,7 @@ The block lists the published resources available to you, by section:
 
 - **Download course PDF** downloads everything in one document.
 - **Download PDF** under a resource downloads only that resource.
-- Interactive activities are marked **Link only**: the course PDF describes them and
+- SCORM and H5P activities are marked **Link only**: the course PDF describes them and
   links to them, but cannot reproduce them.
 
 ![Block with the published resources](docs/screenshots/block-published-list.png)
@@ -104,7 +104,8 @@ A full example generated from the demo course: [docs/screenshots/course-export.p
 | URL (`mod_url`) | Description and the address (configured URL parameters are never added) | Full content |
 | File (`mod_resource`) | PNG/JPEG images embedded; other files named and linked | Partial content |
 | Folder (`mod_folder`) | Description and the list of files, as links (up to 500) | Partial content |
-| SCORM, H5P, eXeLearning (`mod_scorm`, `mod_h5pactivity`, `mod_exelearning`) | Description, a notice and a link to the activity | Link only |
+| eXeLearning (`mod_exelearning`, optional) | Description and every package page in package order (as chapters); text iDevices printed, interactive iDevices named and omitted | Partial content |
+| SCORM, H5P (`mod_scorm`, `mod_h5pactivity`) | Description, a notice and a link to the activity | Link only |
 | Any other module (quiz, assignment, forum...) | Not offered for export | — |
 
 HTML conversion keeps paragraphs, headings, lists, tables, bold and italic text,
@@ -149,6 +150,7 @@ See [DEVELOPMENT.md](DEVELOPMENT.md). In short:
 
 ```bash
 make up && make demo    # Moodle 5.3 + demo course at http://localhost
+make exelearning        # optional: install mod_exelearning from GitHub (then `make demo` adds an eXe activity)
 make lint               # Moodle coding style
 make test               # PHPUnit
 make coverage           # PHPUnit with Xdebug, fails under 90% line coverage

@@ -6,8 +6,6 @@
   },
   "landingPage": "/course/view.php?name=PDFDEMO",
   "constants": {
-    "REPO": "erseco/moodle-block_pdfexport",
-    "REF": "main",
     "ADMIN_USER": "admin",
     "ADMIN_PASS": "password",
     "ADMIN_EMAIL": "admin@example.com",
@@ -39,7 +37,15 @@
       "pluginType": "block",
       "pluginName": "pdfexport",
       "critical": true,
-      "url": "https://github.com/{{REPO}}/archive/refs/heads/{{REF}}.zip"
+      "url": "https://github.com/erseco/moodle-block_pdfexport/archive/refs/heads/main.zip",
+      "comment": "Literal URL so the PR preview action can point it at the PR branch."
+    },
+    {
+      "step": "installMoodlePlugin",
+      "pluginType": "mod",
+      "pluginName": "exelearning",
+      "comment": "Optional: eXeLearning activities are exported page by page when mod_exelearning is installed.",
+      "url": "https://github.com/exelearning/moodle-mod_exelearning/archive/refs/heads/main.zip"
     },
     {
       "step": "installLanguagePack",
@@ -227,6 +233,31 @@
       "displayoptions": 15,
       "enabletracking": 0,
       "grade": 0
+    },
+    {
+      "step": "addModule",
+      "module": "exelearning",
+      "course": "PDFDEMO",
+      "section": 3,
+      "name": "eXeLearning activity",
+      "intro": "An eXeLearning package: its text pages are exported, its interactive iDevices are only named.",
+      "revision": 1,
+      "display": 1,
+      "files": [
+        {
+          "filearea": "package",
+          "itemid": 0,
+          "filename": "actividad-evaluable.elpx",
+          "data": {
+            "url": "https://raw.githubusercontent.com/exelearning/moodle-mod_exelearning/main/research/fixtures/elpx/actividad-evaluable.elpx"
+          }
+        }
+      ]
+    },
+    {
+      "step": "runPhpCode",
+      "comment": "addModule does not run exelearning_add_instance(): extract the package and sync grade items, as mod_exelearning's own blueprint does.",
+      "code": "define('CLI_SCRIPT', true); foreach (['/www/moodle/config.php', getcwd() . '/config.php'] as $c) { if (is_file($c)) { require_once($c); break; } } global $DB, $CFG; require_once($CFG->dirroot . '/mod/exelearning/lib.php'); $fs = get_file_storage(); foreach ($DB->get_records('exelearning') as $exe) { $cm = get_coursemodule_from_instance('exelearning', $exe->id); if (!$cm) { continue; } $ctx = context_module::instance($cm->id); if (exelearning_get_stored_package($ctx->id) === null) { continue; } if (!$fs->get_file($ctx->id, 'mod_exelearning', 'content', (int)$exe->revision, '/', 'index.html')) { exelearning_extract_stored_package($ctx->id, (int)$exe->revision); } if (!$DB->record_exists_select('exelearning_grade_item', 'exelearningid = ? AND deleted = 0 AND itemnumber > 0', [$exe->id])) { exelearning_sync_grade_items($exe->id, $ctx->id); } }"
     },
     {
       "step": "addModule",

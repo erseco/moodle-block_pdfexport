@@ -62,6 +62,8 @@ jobs:
             # The single job that measures coverage. Xdebug, not pcov: pcov
             # under-reports some executed lines (lesson from mod_exelearning).
             coverage: 'xdebug'
+            # Only this job installs mod_exelearning (see "Add mod_exelearning").
+            exelearning: true
           - moodle-branch: 'MOODLE_503_STABLE'
             php: '8.3'
             database: 'mariadb'
@@ -102,11 +104,26 @@ jobs:
           sudo locale-gen en_AU.UTF-8
           echo "NVM_DIR=$HOME/.nvm" >> "$GITHUB_ENV"
 
+      - name: Add mod_exelearning
+        # Optional dependency used by the eXeLearning adapter tests. Installed in one job only:
+        # with it installed, the first @javascript Behat session hangs on GitHub runners
+        # ("core/first" never completes, even with a 100 s timeout), which cannot be reproduced
+        # locally. The other jobs run the JavaScript scenario without it.
+        if: ${{ matrix.exelearning }}
+        run: moodle-plugin-ci add-plugin exelearning/moodle-mod_exelearning
+
       - name: Install moodle-plugin-ci
         run: moodle-plugin-ci install --plugin ./plugin --db-host=127.0.0.1
         env:
           DB: ${{ matrix.database }}
           MOODLE_BRANCH: ${{ matrix.moodle-branch }}
+
+      - name: Configure Behat timeout
+        # First JavaScript page loads on cold caches can exceed Behat's default 10 s wait
+        # on GitHub runners (same setting as mod_exelearning's CI).
+        run: |
+          # shellcheck disable=SC2016 # literal PHP, not a shell expansion
+          moodle-plugin-ci add-config -- '$CFG->behat_increasetimeout = 3;'
 
       - name: PHP Lint
         if: ${{ !cancelled() }}
@@ -159,7 +176,7 @@ jobs:
 
       - name: Behat features
         if: ${{ !cancelled() }}
-        run: moodle-plugin-ci behat --profile chrome
+        run: moodle-plugin-ci behat --profile chrome --dump --tags="${{ matrix.exelearning && '@block_pdfexport&&~@javascript' || '@block_pdfexport&&~@mod_exelearning' }}"
 
       - name: Mark cancelled jobs as failed
         if: ${{ cancelled() }}

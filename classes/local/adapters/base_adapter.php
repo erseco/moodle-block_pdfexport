@@ -49,7 +49,7 @@ abstract class base_adapter {
         'url' => url_adapter::class,
         'scorm' => reference_adapter::class,
         'h5pactivity' => reference_adapter::class,
-        'exelearning' => reference_adapter::class,
+        'exelearning' => exelearning_adapter::class,
     ];
 
     /**

@@ -113,7 +113,7 @@ final class adapters_test extends \advanced_testcase {
     public function test_registry(): void {
         $expected = ['page' => 'full', 'book' => 'full', 'label' => 'full', 'resource' => 'partial',
             'folder' => 'partial', 'url' => 'full', 'scorm' => 'reference', 'h5pactivity' => 'reference',
-            'exelearning' => 'reference'];
+            'exelearning' => 'partial'];
         $this->assertSame(array_keys($expected), base_adapter::get_module_names());
         foreach ($expected as $modname => $support) {
             $this->assertSame($support, base_adapter::for_module($modname)->get_support_level(), $modname);

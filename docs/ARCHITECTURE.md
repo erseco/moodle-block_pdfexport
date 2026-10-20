@@ -14,6 +14,7 @@ Decisions behind it are recorded in [adr/](adr/).
 | `classes/local/resource_detector.php` | Exportable modules of a course, grouped by top-level section in course order (subsections inlined), optionally filtered by access and selection. |
 | `classes/local/export_service.php` | The pipeline: available modules → document model → PDF bytes; file names; limits. |
 | `classes/local/adapters/*` | One adapter per module type: access check, support level, conversion to parts. |
+| `classes/local/adapters/exelearning_adapter.php` | eXeLearning packages: page tree from `#siteNav`, page content from the extracted `content` file area, interactive iDevices replaced (ADR-0007). |
 | `classes/local/print_transformer.php` | HTML → TCPDF-safe HTML: allowlist, links, images from the module's own file area, hidden content, media placeholders, warnings. |
 | `classes/local/pdf_document.php` | TCPDF (`\pdf`) subclass: cover, header, footer, headings with bookmarks, table of contents. |
 | `classes/form/selection_form.php` | Moodle form: one checkbox per exportable module, grouped by section, with toggle-all. |
