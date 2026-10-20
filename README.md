@@ -3,7 +3,7 @@
 [![Moodle Plugin CI](https://github.com/erseco/moodle-block_pdfexport/actions/workflows/ci.yml/badge.svg)](https://github.com/erseco/moodle-block_pdfexport/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/erseco/moodle-block_pdfexport/graph/badge.svg)](https://codecov.io/gh/erseco/moodle-block_pdfexport)
 [![Latest release](https://img.shields.io/github/v/release/erseco/moodle-block_pdfexport?include_prereleases)](https://github.com/erseco/moodle-block_pdfexport/releases)
-[![Preview in Moodle Playground](https://img.shields.io/badge/Preview-Moodle%20Playground-f98012?logo=moodle)](https://moodle-playground.com/?blueprint-url=https%3A%2F%2Fgithub-proxy.exelearning.dev%2F%3Frepo%3Derseco%2Fmoodle-block_pdfexport%26branch%3Dmain%26path%3Dblueprint.json)
+[![Preview in Moodle Playground](https://img.shields.io/badge/Preview-Moodle%20Playground-f98012?logo=moodle)](https://moodle-playground.com/?blueprint-url=https://raw.githubusercontent.com/erseco/moodle-block_pdfexport/refs/heads/main/blueprint.json)
 
 `block_pdfexport` lets teachers choose which course resources to publish, and lets
 students download them as PDF: one resource at a time, or the whole selection as a
@@ -53,7 +53,7 @@ Nothing else is required: Moodle already ships TCPDF and the FreeSans Unicode fo
 ## Quick start
 
 Try it without installing anything: the
-[Moodle Playground preview](https://moodle-playground.com/?blueprint-url=https%3A%2F%2Fgithub-proxy.exelearning.dev%2F%3Frepo%3Derseco%2Fmoodle-block_pdfexport%26branch%3Dmain%26path%3Dblueprint.json)
+[Moodle Playground preview](https://moodle-playground.com/?blueprint-url=https://raw.githubusercontent.com/erseco/moodle-block_pdfexport/refs/heads/main/blueprint.json)
 boots Moodle 5.3 in your browser with a demo course (users `teacher_demo` and
 `student_demo`, password `Demo!2026`; admin `admin` / `password`).
 
