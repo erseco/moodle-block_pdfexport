@@ -6,6 +6,8 @@ All notable changes to this plugin are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-20
+
 ### Added
 - eXeLearning activities (mod_exelearning) are exported page by page: page tree from the
   package navigation, text iDevices printed with their images, interactive iDevices named
@@ -21,6 +23,9 @@ All notable changes to this plugin are documented here. The format follows
   per-resource overrides; Creative Commons 4.0 licenses and custom licenses with an
   optional HTTP(S) link; printed in course and resource PDFs and set in the PDF
   *Author* and *Subject* metadata. No license is ever assumed.
+- Optional "Cover CSS" for the course PDF cover (#6): documented selectors and an
+  allowlist of properties and values; an invalid stylesheet falls back to the default
+  cover. Kept in backup and restore.
 - Restore support: the published selection and attribution overrides follow the
   restored course modules.
 - Null privacy provider.
