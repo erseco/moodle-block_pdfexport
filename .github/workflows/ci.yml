@@ -62,8 +62,6 @@ jobs:
             # The single job that measures coverage. Xdebug, not pcov: pcov
             # under-reports some executed lines (lesson from mod_exelearning).
             coverage: 'xdebug'
-            # Only this job installs mod_exelearning (see "Add mod_exelearning").
-            exelearning: true
           - moodle-branch: 'MOODLE_503_STABLE'
             php: '8.3'
             database: 'mariadb'
@@ -105,11 +103,7 @@ jobs:
           echo "NVM_DIR=$HOME/.nvm" >> "$GITHUB_ENV"
 
       - name: Add mod_exelearning
-        # Optional dependency used by the eXeLearning adapter tests. Installed in one job only:
-        # with it installed, the first @javascript Behat session hangs on GitHub runners
-        # ("core/first" never completes, even with a 100 s timeout), which cannot be reproduced
-        # locally. The other jobs run the JavaScript scenario without it.
-        if: ${{ matrix.exelearning }}
+        # Optional dependency: the eXeLearning adapter's PHPUnit and Behat tests use it.
         run: moodle-plugin-ci add-plugin exelearning/moodle-mod_exelearning
 
       - name: Install moodle-plugin-ci
@@ -176,7 +170,7 @@ jobs:
 
       - name: Behat features
         if: ${{ !cancelled() }}
-        run: moodle-plugin-ci behat --profile chrome --dump --tags="${{ matrix.exelearning && '@block_pdfexport&&~@javascript' || '@block_pdfexport&&~@mod_exelearning' }}"
+        run: moodle-plugin-ci behat --profile chrome --dump
 
       - name: Mark cancelled jobs as failed
         if: ${{ cancelled() }}
