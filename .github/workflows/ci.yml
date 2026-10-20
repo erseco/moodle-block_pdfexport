@@ -1,0 +1,174 @@
+name: Moodle Plugin CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+  # Reused by release.yml: a release is only built after every gate passes.
+  workflow_call:
+
+permissions:
+  contents: read
+
+# A new push cancels the previous run of the same PR or branch.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: 'postgres'
+          POSTGRES_HOST_AUTH_METHOD: 'trust'
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MYSQL_USER: 'root'
+          MYSQL_ALLOW_EMPTY_PASSWORD: "true"
+          MYSQL_CHARACTER_SET_SERVER: "utf8mb4"
+          MYSQL_COLLATION_SERVER: "utf8mb4_unicode_ci"
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # Moodle 5.3 LTS requires PHP 8.3+, PostgreSQL 17+ and MariaDB 11.4+.
+        include:
+          - moodle-branch: 'MOODLE_503_STABLE'
+            php: '8.3'
+            database: 'pgsql'
+            # The single job that measures coverage. Xdebug, not pcov: pcov
+            # under-reports some executed lines (lesson from mod_exelearning).
+            coverage: 'xdebug'
+          - moodle-branch: 'MOODLE_503_STABLE'
+            php: '8.3'
+            database: 'mariadb'
+          - moodle-branch: 'MOODLE_503_STABLE'
+            php: '8.4'
+            database: 'pgsql'
+          - moodle-branch: 'MOODLE_503_STABLE'
+            php: '8.4'
+            database: 'mariadb'
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v7
+        with:
+          path: plugin
+          persist-credentials: false
+
+      - name: Setup PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          ini-values: max_input_vars=5000
+          coverage: ${{ matrix.coverage || 'none' }}
+
+      - name: Initialise moodle-plugin-ci
+        run: |
+          composer create-project -n --no-dev --prefer-dist moodlehq/moodle-plugin-ci ci ^4
+          echo "$PWD/ci/bin" >> "$GITHUB_PATH"
+          echo "$PWD/ci/vendor/bin" >> "$GITHUB_PATH"
+          sudo locale-gen en_AU.UTF-8
+          echo "NVM_DIR=$HOME/.nvm" >> "$GITHUB_ENV"
+
+      - name: Install moodle-plugin-ci
+        run: moodle-plugin-ci install --plugin ./plugin --db-host=127.0.0.1
+        env:
+          DB: ${{ matrix.database }}
+          MOODLE_BRANCH: ${{ matrix.moodle-branch }}
+
+      - name: PHP Lint
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci phplint
+
+      - name: PHP Mess Detector
+        # Advisory, as in mod_exelearning: it reports complexity, not defects.
+        continue-on-error: true
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci phpmd
+
+      - name: Moodle Code Checker
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci phpcs --max-warnings 0
+
+      - name: Moodle PHPDoc Checker
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci phpdoc --max-warnings 0
+
+      - name: Validating
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci validate
+
+      - name: Check upgrade savepoints
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci savepoints
+
+      - name: Mustache Lint
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci mustache
+
+      - name: PHPUnit tests
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci phpunit --fail-on-warning ${{ matrix.coverage && '--coverage-text --coverage-clover' || '' }}
+
+      - name: Enforce the 90% coverage minimum
+        if: ${{ matrix.coverage && !cancelled() }}
+        run: php plugin/scripts/check-coverage.php coverage.xml 90
+
+      - name: Upload coverage to Codecov
+        # Reporting only; the blocking gate is the step above. Needs CODECOV_TOKEN.
+        if: ${{ matrix.coverage && !cancelled() }}
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.xml
+          flags: php
+          disable_search: true
+          fail_ci_if_error: false
+
+      - name: Behat features
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci behat --profile chrome
+
+      - name: Mark cancelled jobs as failed
+        if: ${{ cancelled() }}
+        run: exit 1
+
+  package:
+    # Version metadata and release ZIP layout: fast, no Moodle needed.
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate version metadata
+        run: bash scripts/check-version.sh || bash scripts/check-version.sh --release "$(sed -n "s/^\$plugin->release *= *'\(.*\)';/\1/p" version.php)"
+
+      - name: Validate release packaging
+        run: bash scripts/check-package.sh

@@ -1,0 +1,22 @@
+# Development-only paths are left out of `git archive`, which builds the release ZIP
+# (scripts/package.sh). The release contains only what Moodle needs to run the plugin.
+/.github            export-ignore
+/.gitattributes     export-ignore
+/.gitignore         export-ignore
+/.editorconfig      export-ignore
+/.env.dist          export-ignore
+/.moodle-plugin-ci.yml export-ignore
+/.phpcs.xml.dist    export-ignore
+/AGENTS.md          export-ignore
+/CLAUDE.md          export-ignore
+/CONTRIBUTING.md    export-ignore
+/DEVELOPMENT.md     export-ignore
+/Makefile           export-ignore
+/blueprint.json     export-ignore
+/codecov.yml        export-ignore
+/composer.json      export-ignore
+/composer.lock      export-ignore
+/docker-compose.yml export-ignore
+/docs               export-ignore
+/scripts            export-ignore
+/tests              export-ignore

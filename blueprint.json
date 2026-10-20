@@ -1,0 +1,249 @@
+{
+  "$schema": "https://raw.githubusercontent.com/ateeducacion/moodle-playground/refs/heads/main/assets/blueprints/blueprint-schema.json",
+  "preferredVersions": {
+    "php": "8.3",
+    "moodle": "5.3"
+  },
+  "landingPage": "/course/view.php?name=PDFDEMO",
+  "constants": {
+    "REPO": "erseco/moodle-block_pdfexport",
+    "REF": "main",
+    "ADMIN_USER": "admin",
+    "ADMIN_PASS": "password",
+    "ADMIN_EMAIL": "admin@example.com",
+    "DEMO_PASS": "Demo!2026"
+  },
+  "resources": {
+    "diagram": {
+      "base64": "iVBORw0KGgoAAAANSUhEUgAAAeAAAADcCAIAAAAneeWgAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAFH0lEQVR42u3cPXLiShSAUUORQwC7UsByyCgylsO+IGAJDnCp2q1GfwhoSefUBB77YTPUvZ/a8sxbrIvTDwD5WXoJAAQaAIEGEGgABBpAoAEQaAAEGkCgARBoAIEGQKABEGgAgQZAoAEEGgCBBhBoAAQaAIEGEGgABBpAoAEQaAAEGkCgARBoAIEGQKABBBoAgQZAoAEEGgCBBpiJlZeAnN0Px3d/ic355HUmT4t1YTqZZnl1HIGGSYVYuBFotFi1QaCRY8lGoFFk9BqBRpH1GoFGlBFrBBpRRqwRaERZrBFoRBmxRqDRZaVGoNFllBqBRpdRaoFGl1FqBBppRqYRaF0GpRZopBmZRqB1GZRaoJFmZBqBRpqRaQRamkGmBRppRqYRaGkGmRZopBmZRqClGWR69pZeAnUGU+oEjaHHURqBlmaQ6fFzi0OdwQw7QRtrcJTGCVqdwVQ7QWOIcZTWECdodQZzLtCYWjDtOXCLw7DCYNzucIJWZzD/Ao3pBFsg0OYS7AICbSLBRgi0WQR7gUCbQrAdAo35Azsi0CYPbIpAY+bAvgi0aQNbg0CbM7A7Am3CABsk0GYL7JFAAyDQLvtgmxBo8wR2SqABEGiXerBZAm2GAPsl0AAItMs72DKBBkCgXdjBrgk0AALtkg42TqABEGgXc8DeCTSAQAMg0L7PAtsn0AAINAACDSDQAPSxWBcnr0Jpbj+j2O231XdeL7fkhx7vf/ao8D/o+rXG+9KN9/nnbHMWpT8rLwFhZXb77W6/Ld8TRjl8f+82ZVI0eWUU3OKgQ1ifnZ0BJ2imqXqeLd8TvVE99obXjOgmTPio5DWm6zn62XOoeRrVP0L1j5nV9xY4QZNdH8tf7UsRParf10qmMxmy6+VWU9joQ+Fvo4+Wv43ebn8Vibpf8zTKZx690fgocILmpbPbsI96VO/ZETVMank3POp4+KHkAwc844eNbvM0Wn7Cxkch0PC168R4f3bn/ItAM/E7LdFtgcl/FwL13IOmz/f47/v8yRuyyfsJjXeu23/pxvNv8mslP/TKJ1R5nKDp+Z37IPmIyhX9+K58Z/WvYydvT9ffua7vY9cHhg+p/v2Q5I89B38OzI1/SfiP/9vh3E7uZMi/JHSLw2SAHcydWxxkzdkZJ2gABBoAgQYQ6EnxMwqwfQINgEADCLTvswB7J9AAAu1iDtg4gQZAoF3Swa4JNAAC7cIOtkygARBol3ewXwKNGQKbJdAACLRLPdgpgTZPgG0SaACBxmUf7JFAmy2wQQi0CQO7I9DmDLA1Am3awL4INGYObIpAmzywIwKN+QPbIdCmEOwFAm0WwUYINCYS7IJAm0uwBQKN6QTz/22LdeEFfYv74ehFQJpxgjavYNoFGlML5vxT3OL4BLc7kGacoM0xmGonaBylkWacoE02mGEnaBylQZoFGplGmmniFoe5B1PqBI2jNNKMQMs0SLNAI9NIMwIt0yDNAo1MI80INDKNNCPQMg3SLNAoNbqMQMs0SLNAo9ToMgKNTCPNCLRSo8sINEqNLiPQKLUuI9AoNbqMQCPWiLJAI9aIMgKNWCPKCDRiLcoINHqNIiPQ6LUiI9Ag2XKMQKPaWgwCjXALMQIN2XdceRFoALpZegkABBoAgQYQaAAEGkCgARBoAAQaQKABEGgAgQZAoAEQaACBBkCgAQQaAIEGEGgABBoAgQYQaAAEGkCgARBoAAQaQKABEGgAgQZAoAEEGgCBBkCgAQQagKH9AumN0TbQw3LwAAAAAElFTkSuQmCC"
+    }
+  },
+  "steps": [
+    {
+      "step": "installMoodle",
+      "options": {
+        "adminUser": "{{ADMIN_USER}}",
+        "adminPass": "{{ADMIN_PASS}}",
+        "adminEmail": "{{ADMIN_EMAIL}}",
+        "siteName": "PDF Export Playground",
+        "locale": "en",
+        "timezone": "Europe/Madrid"
+      }
+    },
+    {
+      "step": "login",
+      "username": "{{ADMIN_USER}}"
+    },
+    {
+      "step": "installMoodlePlugin",
+      "pluginType": "block",
+      "pluginName": "pdfexport",
+      "critical": true,
+      "url": "https://github.com/{{REPO}}/archive/refs/heads/{{REF}}.zip"
+    },
+    {
+      "step": "installLanguagePack",
+      "language": "es"
+    },
+    {
+      "step": "createCategory",
+      "name": "PDF Export Demo"
+    },
+    {
+      "step": "createCourse",
+      "fullname": "PDF Export Demo Course",
+      "shortname": "PDFDEMO",
+      "category": "PDF Export Demo",
+      "numsections": 0,
+      "summary": "<p>Demonstration course for the <strong>PDF Export</strong> block. Curso de demostración: los acentos y la eñe se exportan correctamente.</p>"
+    },
+    {
+      "step": "createSections",
+      "sections": [
+        {
+          "course": "PDFDEMO",
+          "name": "Introduction / Introducción"
+        },
+        {
+          "course": "PDFDEMO",
+          "name": "Learning resources / Recursos"
+        },
+        {
+          "course": "PDFDEMO",
+          "name": "Activities / Actividades"
+        }
+      ]
+    },
+    {
+      "step": "createUsers",
+      "users": [
+        {
+          "username": "teacher_demo",
+          "password": "{{DEMO_PASS}}",
+          "email": "teacher_demo@example.com",
+          "firstname": "Teacher",
+          "lastname": "Demo"
+        },
+        {
+          "username": "student_demo",
+          "password": "{{DEMO_PASS}}",
+          "email": "student_demo@example.com",
+          "firstname": "Student",
+          "lastname": "Demo"
+        }
+      ]
+    },
+    {
+      "step": "enrolUsers",
+      "enrolments": [
+        {
+          "username": "{{ADMIN_USER}}",
+          "course": "PDFDEMO",
+          "role": "editingteacher"
+        },
+        {
+          "username": "teacher_demo",
+          "course": "PDFDEMO",
+          "role": "editingteacher"
+        },
+        {
+          "username": "student_demo",
+          "course": "PDFDEMO",
+          "role": "student"
+        }
+      ]
+    },
+    {
+      "step": "addModule",
+      "module": "page",
+      "course": "PDFDEMO",
+      "section": 1,
+      "name": "Welcome / Bienvenida",
+      "intro": "Welcome page",
+      "contentformat": 1,
+      "content": "<h2>Welcome</h2><p>This page is exported with its <em>formatting</em>, tables and images.</p><p><img src=\"@@PLUGINFILE@@/diagram.png\" alt=\"Course diagram\"></p><table><caption>Course plan</caption><tr><th>Week</th><th>Topic</th></tr><tr><td>1</td><td>Introducción y bienvenida</td></tr><tr><td>2</td><td>Recursos de aprendizaje</td></tr></table><details><summary>What is included in the PDF?</summary><p>Pages, books, text and media areas, images stored in Moodle, and links to everything else.</p></details><h2>Bienvenida</h2><p>Esta página se exporta con su formato, tablas e imágenes.</p>",
+      "files": [
+        {
+          "filearea": "content",
+          "itemid": 0,
+          "filename": "diagram.png",
+          "data": "@diagram"
+        }
+      ]
+    },
+    {
+      "step": "addModule",
+      "module": "book",
+      "course": "PDFDEMO",
+      "section": 1,
+      "name": "Introduction book",
+      "intro": "A book with chapters and a subchapter.",
+      "numbering": 1
+    },
+    {
+      "step": "runPhpCode",
+      "comment": "Book chapters: there is no blueprint step for them.",
+      "code": "define('CLI_SCRIPT', true); foreach (['/www/moodle/config.php', getcwd() . '/config.php'] as $c) { if (is_file($c)) { require_once($c); break; } } global $DB, $CFG; $course = $DB->get_record('course', ['shortname' => 'PDFDEMO'], '*', MUST_EXIST); $book = $DB->get_record('book', ['course' => $course->id, 'name' => 'Introduction book'], '*', MUST_EXIST); if (!$DB->record_exists('book_chapters', ['bookid' => $book->id])) { $chapters = [['Chapter 1: Getting started', 0, 0, '<p>Read the welcome page first, then explore each section.</p><ul><li>Pages and books are printed in full.</li><li>Files, folders and links are listed.</li></ul>'], ['Navigating the course', 1, 0, '<p>Use the course index to move between sections.</p>'], ['Chapter 2: Capítulo en español', 0, 0, '<p>El PDF conserva las tildes, la eñe y la estructura de capítulos y subcapítulos.</p>'], ['Teacher notes (hidden chapter)', 0, 1, '<p>Students never see this hidden chapter.</p>']]; foreach ($chapters as $i => [$title, $sub, $hidden, $content]) { $DB->insert_record('book_chapters', (object)['bookid' => $book->id, 'pagenum' => $i + 1, 'subchapter' => $sub, 'title' => $title, 'content' => $content, 'contentformat' => FORMAT_HTML, 'hidden' => $hidden, 'timecreated' => time(), 'timemodified' => time(), 'importsrc' => '']); } rebuild_course_cache($course->id, true); }"
+    },
+    {
+      "step": "addModule",
+      "module": "label",
+      "course": "PDFDEMO",
+      "section": 2,
+      "name": "Tip",
+      "intro": "<p><strong>Tip:</strong> the course PDF contains every published resource in course order.</p>"
+    },
+    {
+      "step": "addModule",
+      "module": "resource",
+      "course": "PDFDEMO",
+      "section": 2,
+      "name": "Course poster (image file)",
+      "intro": "An image file, embedded in the PDF.",
+      "files": [
+        {
+          "filearea": "content",
+          "itemid": 0,
+          "filename": "poster.png",
+          "data": "@diagram"
+        }
+      ]
+    },
+    {
+      "step": "addModule",
+      "module": "folder",
+      "course": "PDFDEMO",
+      "section": 2,
+      "name": "Course materials",
+      "intro": "Files listed with links.",
+      "files": [
+        {
+          "filearea": "content",
+          "itemid": 0,
+          "filename": "syllabus.txt",
+          "data": {
+            "literal": "Course syllabus"
+          }
+        },
+        {
+          "filearea": "content",
+          "itemid": 0,
+          "filepath": "/exercises/",
+          "filename": "week1.txt",
+          "data": {
+            "literal": "Week 1 exercises"
+          }
+        }
+      ]
+    },
+    {
+      "step": "addModule",
+      "module": "url",
+      "course": "PDFDEMO",
+      "section": 2,
+      "name": "External references",
+      "intro": "Moodle developer documentation.",
+      "externalurl": "https://moodledev.io/docs/5.3"
+    },
+    {
+      "step": "addModule",
+      "module": "h5pactivity",
+      "course": "PDFDEMO",
+      "section": 3,
+      "name": "Interactive H5P activity",
+      "intro": "An interactive activity: the PDF only describes it and links to it.",
+      "files": [
+        {
+          "filearea": "package",
+          "itemid": 0,
+          "filename": "greeting-card.h5p",
+          "data": {
+            "url": "https://raw.githubusercontent.com/moodle/moodle/MOODLE_503_STABLE/public/h5p/tests/fixtures/greeting-card.h5p"
+          }
+        }
+      ],
+      "timecreated": 1760918400,
+      "timemodified": 1760918400,
+      "displayoptions": 15,
+      "enabletracking": 0,
+      "grade": 0
+    },
+    {
+      "step": "addModule",
+      "module": "quiz",
+      "course": "PDFDEMO",
+      "section": 3,
+      "name": "Practice quiz (never exported)",
+      "intro": "Quizzes are not offered for export."
+    },
+    {
+      "step": "runPhpCode",
+      "comment": "Add the PDF Export block to the course and publish every exportable resource.",
+      "code": "define('CLI_SCRIPT', true); foreach (['/www/moodle/config.php', getcwd() . '/config.php'] as $c) { if (is_file($c)) { require_once($c); break; } } global $DB, $CFG; $course = $DB->get_record('course', ['shortname' => 'PDFDEMO'], '*', MUST_EXIST); $context = context_course::instance($course->id); if (!$DB->record_exists('block_instances', ['blockname' => 'pdfexport', 'parentcontextid' => $context->id])) { $page = new moodle_page(); $page->set_course($course); $page->set_pagetype('course-view-' . $course->format); $page->blocks->add_region('side-pre'); $page->blocks->add_block('pdfexport', 'side-pre', -10, false, 'course-view-*'); } $record = $DB->get_record('block_instances', ['blockname' => 'pdfexport', 'parentcontextid' => $context->id], '*', MUST_EXIST); $cmids = []; foreach (get_fast_modinfo($course)->get_cms() as $cm) { if ($cm->modname !== 'quiz') { $cmids[] = $cm->id; } } \\block_pdfexport\\local\\publication::save(block_instance('pdfexport', $record), $cmids);"
+    },
+    {
+      "step": "setLandingPage",
+      "path": "/course/view.php?name=PDFDEMO"
+    }
+  ]
+}

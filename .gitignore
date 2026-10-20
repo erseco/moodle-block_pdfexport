@@ -1,0 +1,7 @@
+/vendor/
+/.env
+/coverage/
+/coverage.xml
+/block_pdfexport-*.zip
+.DS_Store
+.phpunit.result.cache

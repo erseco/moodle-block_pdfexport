@@ -1,0 +1,32 @@
+# Codecov configuration for block_pdfexport (ADR-0005).
+#
+# Two project gates: an absolute 90% minimum ("minimum") and a ratchet that
+# fails any change lowering coverage by more than 0.5% ("ratchet"). The ratchet
+# alone would accept a low starting figure; the minimum alone would allow slow
+# erosion down to 90%. CI also enforces the 90% minimum itself
+# (scripts/check-coverage.php), so the gate holds even if Codecov is down.
+#
+# moodle-plugin-ci installs the plugin in moodle/public/blocks/pdfexport/; the
+# fix maps report paths back onto the repository tree.
+fixes:
+  - "moodle/public/blocks/pdfexport/::"
+
+coverage:
+  status:
+    project:
+      minimum:
+        target: 90%
+      ratchet:
+        target: auto
+        threshold: 0.5%
+    patch:
+      default:
+        target: 90%
+
+flags:
+  php:
+    carryforward: true
+
+comment:
+  layout: "condensed_header, diff, flags, files"
+  require_changes: false
