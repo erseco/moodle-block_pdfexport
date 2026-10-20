@@ -33,6 +33,12 @@ mod_exelearning extracts to its `content` file area (item = `revision`):
 - **Optional dependency**: mod_exelearning is installed from its repository in
   development (`make exelearning`), CI (`moodle-plugin-ci add-plugin`) and Playground
   (`installMoodlePlugin`). The tests skip themselves when it is missing.
+- **CI**: only the coverage job (PHP 8.3, PostgreSQL) installs mod_exelearning. It runs all
+  PHPUnit tests and the non-JavaScript Behat scenarios. With mod_exelearning installed, the
+  first `@javascript` Behat session hangs on GitHub runners ("core/first" never completes,
+  even with a 100 s timeout). This could not be reproduced locally with the same Moodle
+  build, browser image or `php -S` server. The other three jobs therefore run the
+  JavaScript scenario without mod_exelearning.
 
 Reading the exported HTML instead of `content.xml` uses the format eXeLearning publishes
 for browsers, and avoids depending on mod_exelearning's internal parser classes.
