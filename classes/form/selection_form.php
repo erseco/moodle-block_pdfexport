@@ -22,6 +22,7 @@ global $CFG;
 require_once($CFG->libdir . '/formslib.php');
 
 use block_pdfexport\local\adapters\base_adapter;
+use block_pdfexport\local\cover_css;
 use block_pdfexport\local\publication;
 
 /**
@@ -34,7 +35,7 @@ use block_pdfexport\local\publication;
 class selection_form extends \moodleform {
     /**
      * Defines one checkbox per exportable module, under a header per section, each with an
-     * optional attribution override, then the default attribution.
+     * optional attribution override, then the default attribution and the cover stylesheet.
      */
     protected function definition() {
         global $PAGE;
@@ -45,14 +46,16 @@ class selection_form extends \moodleform {
         $attributiondefaults = $settings['default'];
         // Select all / none without a page reload, through core/checkbox-toggleall: one toggler
         // for the whole course and one per section (its toggle group is a subgroup of the first).
-        $PAGE->requires->js_call_amd('core/checkbox-toggleall', 'init');
-        $mform->addElement(
-            'advcheckbox',
-            'selectall',
-            '',
-            get_string('selectall'),
-            $this->toggler_attributes('pdfexport')
-        );
+        if ($this->_customdata['sections']) {
+            $PAGE->requires->js_call_amd('core/checkbox-toggleall', 'init');
+            $mform->addElement(
+                'advcheckbox',
+                'selectall',
+                '',
+                get_string('selectall'),
+                $this->toggler_attributes('pdfexport')
+            );
+        }
         foreach ($this->_customdata['sections'] as $section) {
             $group = 'pdfexport section' . $section['number'];
             $mform->addElement('header', 'section' . $section['number'], s($section['name']));
@@ -87,6 +90,18 @@ class selection_form extends \moodleform {
         $mform->addHelpButton('authors', 'authors', 'block_pdfexport');
         $this->add_license_fields('');
         $mform->addHelpButton('licenseurl', 'licenseurl', 'block_pdfexport');
+        // Course PDF cover stylesheet, a strict CSS subset validated in validation().
+        $mform->addElement('header', 'coverheader', get_string('coverstyle', 'block_pdfexport'));
+        $mform->addElement('textarea', 'covercss', get_string('covercss', 'block_pdfexport'), [
+            'rows' => 10,
+            'cols' => 60,
+            'spellcheck' => 'false',
+            'class' => 'text-monospace',
+        ]);
+        // Raw on purpose: cleaning would silently alter the stylesheet; cover_css::parse() validates it.
+        $mform->setType('covercss', PARAM_RAW);
+        $mform->addHelpButton('covercss', 'covercss', 'block_pdfexport');
+        $mform->setDefault('covercss', $this->_customdata['covercss'] ?? '');
         // Element names are "cm[<id>]", so QuickForm reads their defaults from a nested array.
         $mform->setDefaults(array_merge(['cm' => $defaults], $attributiondefaults));
         $this->add_action_buttons();
@@ -155,7 +170,8 @@ class selection_form extends \moodleform {
     }
 
     /**
-     * Requires a name for custom licenses and an HTTP(S) license URL, for the default and every override.
+     * Requires a name for custom licenses and an HTTP(S) license URL, for the default and every
+     * override, and a cover stylesheet within the supported CSS subset.
      *
      * @param array $data Submitted form data.
      * @param array $files Submitted files.
@@ -182,6 +198,11 @@ class selection_form extends \moodleform {
             if ($url !== '' && !publication::is_valid_url($url)) {
                 $errors[$urlfield] = get_string('invalidlicenseurl', 'block_pdfexport');
             }
+        }
+        try {
+            cover_css::parse((string)($data['covercss'] ?? ''));
+        } catch (\moodle_exception $e) {
+            $errors['covercss'] = $e->getMessage();
         }
         return $errors;
     }

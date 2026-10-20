@@ -94,7 +94,7 @@ final class export_service_test extends \advanced_testcase {
      * Returns a service for the current user.
      *
      * @param int[] $selected Selection.
-     * @param \stdClass|null $config Block configuration holding the attribution.
+     * @param \stdClass|null $config Block configuration holding the attribution and cover CSS.
      * @return export_service
      */
     private function service(array $selected, ?\stdClass $config = null): export_service {
@@ -102,7 +102,8 @@ final class export_service_test extends \advanced_testcase {
             get_course($this->course->id),
             $selected,
             attribution: $config ? publication::get_attribution($config) : [],
-            cmattributions: publication::get_cm_attributions($config)
+            cmattributions: publication::get_cm_attributions($config),
+            coverstyles: publication::get_cover_styles($config)
         );
     }
 
@@ -186,6 +187,33 @@ final class export_service_test extends \advanced_testcase {
             }
         }
         return trim(preg_replace('/\s+/u', ' ', implode(' ', $lines)));
+    }
+
+    /**
+     * Returns the decompressed content stream of every page, in page order.
+     *
+     * @param string $pdf PDF bytes.
+     * @return string[] One drawing stream per page.
+     */
+    private static function page_streams(string $pdf): array {
+        preg_match_all('~/Type /Page\b.*?/Contents (\d+) 0 R~s', $pdf, $contents);
+        $pages = [];
+        foreach ($contents[1] as $id) {
+            preg_match('~\n' . $id . ' 0 obj\n<<[^>]*>>\s*stream\r?\n(.*?)\r?\nendstream~s', $pdf, $stream);
+            $pages[] = gzuncompress($stream[1]);
+        }
+        return $pages;
+    }
+
+    /**
+     * Returns the PDF operator that selects a fill (text) colour.
+     *
+     * @param string $hex Colour as #rrggbb.
+     * @return string Operator such as "0.070588 0.203922 0.337255 rg".
+     */
+    private static function fill_colour(string $hex): string {
+        [$r, $g, $b] = array_map(fn(string $pair): float => hexdec($pair) / 255, str_split(substr($hex, 1), 2));
+        return sprintf('%F %F %F rg', $r, $g, $b);
     }
 
     /**
@@ -476,10 +504,115 @@ final class export_service_test extends \advanced_testcase {
     }
 
     /**
+     * Without cover CSS the cover keeps its built-in style: no page fill, 26 pt accent title.
+     */
+    public function test_default_cover(): void {
+        $this->setUser($this->users['student']);
+        foreach ([null, (object)['covercss' => ''], (object)['covercss' => 'body { color: #ff0000 }']] as $config) {
+            $service = $this->service($this->ids('welcome'), $config);
+            $pages = self::page_streams($service->render($service->build_course_document()));
+            $this->assertStringContainsString(' 26.000000 Tf', $pages[0]);
+            $this->assertStringContainsString(self::fill_colour('#0f4c81'), $pages[0]);
+            $this->assertStringNotContainsString(self::fill_colour('#ff0000'), $pages[0]);
+            $this->assertDoesNotMatchRegularExpression('/ re\s+f\b/', $pages[0]);
+        }
+        $this->assertDebuggingCalled();
+    }
+
+    /**
+     * Cover CSS styles the cover page only: the TOC, the body, the outline and single resource
+     * PDFs are drawn exactly as without it, and each block configuration gets its own cover.
+     */
+    public function test_cover_styles_only_affect_the_cover(): void {
+        $this->setUser($this->users['student']);
+        $selected = $this->ids('welcome', 'book');
+        $config = $this->attribution_config();
+        $plain = $this->service($selected, $config);
+        $default = $plain->render($plain->build_course_document());
+
+        $config->covercss = ".pdfexport-cover { background-color: #fdf6e3 }\n" .
+            ".pdfexport-cover-title { color: #123456; font-size: 30pt; text-align: left }\n" .
+            ".pdfexport-cover-subtitle { color: #00aa00; font-size: 15pt }\n" .
+            ".pdfexport-cover-attribution { color: #aa00aa; font-size: 11pt }\n" .
+            ".pdfexport-cover-summary { color: #b00020; font-size: 14pt }\n" .
+            ".pdfexport-cover-date { color: #0000cc; font-size: 7pt }";
+        $styled = $this->service($selected, $config);
+        $pdf = $styled->render($styled->build_course_document());
+
+        $this->assertStringStartsWith('%PDF-', $pdf);
+        $this->assertStringEndsWith("%%EOF\n", $pdf);
+        $pages = self::page_streams($pdf);
+        $defaultpages = self::page_streams($default);
+        $this->assertCount(count($defaultpages), $pages);
+        $cover = $pages[0];
+        foreach (['30', '15', '11', '14', '7'] as $size) {
+            $this->assertStringContainsString(' ' . $size . '.000000 Tf', $cover);
+        }
+        $this->assertStringNotContainsString(' 26.000000 Tf', $cover);
+        foreach (['#123456', '#00aa00', '#aa00aa', '#b00020', '#0000cc', '#fdf6e3'] as $colour) {
+            $this->assertStringContainsString(self::fill_colour($colour), $cover);
+            foreach (array_slice($pages, 1) as $page) {
+                $this->assertStringNotContainsString(self::fill_colour($colour), $page);
+            }
+        }
+        // The page fill is drawn before any text, so it stays behind it.
+        $this->assertLessThan(strpos($cover, ' TJ'), strpos($cover, ' re f'));
+        // TOC, headings, body, running headers and footers are byte for byte the default ones.
+        $this->assertSame(array_slice($defaultpages, 1), array_slice($pages, 1));
+        $this->assertSame(self::pdf_info($default, 'Title'), self::pdf_info($pdf, 'Title'));
+        $this->assertSame(self::pdf_info($default, 'Author'), self::pdf_info($pdf, 'Author'));
+        $this->assertSame(self::pdf_info($default, 'Subject'), self::pdf_info($pdf, 'Subject'));
+        preg_match_all('~/Title \(([^)]*)\) /Parent~', $default, $outline);
+        preg_match_all('~/Title \(([^)]*)\) /Parent~', $pdf, $styledoutline);
+        $this->assertNotEmpty($outline[1]);
+        $this->assertSame($outline[1], $styledoutline[1]);
+        $this->assertStringContainsString('Introduction to Technology', self::page_text($pdf));
+
+        // Single resource PDFs have no cover and ignore the stylesheet.
+        $cmid = $this->ids('book')[0];
+        $this->assertSame(
+            self::page_streams($plain->render($plain->build_module_document($cmid))),
+            self::page_streams($styled->render($styled->build_module_document($cmid)))
+        );
+
+        // Another block configuration renders its own style.
+        $other = $this->service($selected, (object)['covercss' => '.pdfexport-cover-title { color: #654321; font-size: 40pt }']);
+        $cover = self::page_streams($other->render($other->build_course_document()))[0];
+        $this->assertStringContainsString(' 40.000000 Tf', $cover);
+        $this->assertStringContainsString(self::fill_colour('#654321'), $cover);
+        $this->assertStringNotContainsString(self::fill_colour('#123456'), $cover);
+        $this->assertDoesNotMatchRegularExpression('/ re\s+f\b/', $cover);
+    }
+
+    /**
+     * Long titles and summaries with a large font flow onto further cover pages without losing text.
+     */
+    public function test_long_styled_cover(): void {
+        global $DB;
+        $this->setUser($this->users['student']);
+        $title = trim(str_repeat('Very long course title ', 12));
+        $summary = '<p>' . trim(str_repeat('Summary sentence that keeps going. ', 120)) . ' THE END</p>';
+        $DB->update_record('course', (object)['id' => $this->course->id, 'fullname' => $title, 'summary' => $summary]);
+        $config = (object)['covercss' => '.pdfexport-cover { font-size: 24pt; line-height: 2 }'];
+        $service = $this->service($this->ids('welcome'), $config);
+        $pdf = $service->render($service->build_course_document());
+        $text = self::page_text($pdf);
+        $this->assertStringContainsString('THE END', $text);
+        $this->assertStringContainsString('Welcome text', $text);
+        foreach (self::page_streams($pdf) as $page) {
+            $this->assertMatchesRegularExpression('/ Tf\b/', $page, 'Empty page');
+        }
+    }
+
+    /**
      * Attribution HTML escapes every value and spells out unknown values only when asked.
      */
     public function test_attribution_html(): void {
         $this->assertSame('', pdf_document::get_attribution_html([]));
+        $this->assertStringContainsString(
+            'style="font-size:9pt;text-align:center;color:#555555;color:#123456;"',
+            pdf_document::get_attribution_html(['authors' => ['A']], false, 'color:#123456;')
+        );
         $this->assertSame('', pdf_document::get_attribution_html(['authors' => [], 'license' => '', 'licenseurl' => '']));
         $html = pdf_document::get_attribution_html([
             'authors' => ['<b>Eve</b>', 'O\'Brien & Co'],

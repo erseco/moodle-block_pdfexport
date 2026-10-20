@@ -103,31 +103,50 @@ class pdf_document extends \pdf {
     /**
      * Adds a cover page without header and footer.
      *
+     * Custom styles are appended to the built-in inline style of each element, so they override
+     * it (TCPDF keeps the last duplicate declaration); without them the cover is unchanged.
+     *
      * @param string $title Main title.
      * @param string $subtitle Subtitle (plain text).
      * @param string $summaryhtml Printable HTML summary.
      * @param string $footnote Plain text printed below the summary.
      * @param array $attribution Default attribution, see add_attribution().
+     * @param array[] $styles Validated cover styles, see cover_css::parse().
      */
     public function add_cover(
         string $title,
         string $subtitle,
         string $summaryhtml,
         string $footnote,
-        array $attribution = []
+        array $attribution = [],
+        array $styles = []
     ): void {
+        $style = fn(string $element): string => s(cover_css::declarations($styles, $element));
         $this->oncover = true;
         $this->AddPage();
+        if (isset($styles['cover']['background-color'])) {
+            // Isolated in a PDF graphics state, and TCPDF's colour tracking restored, so the fill
+            // colour never leaks into the rest of the cover or the following pages.
+            $state = [$this->FillColor, $this->bgcolor, $this->ColorFlag];
+            $colour = \TCPDF_COLORS::convertHTMLColorToDec($styles['cover']['background-color'], $this->spot_colors);
+            $this->_out('q');
+            $this->Rect(0, 0, $this->getPageWidth(), $this->getPageHeight(), 'F', [], $colour);
+            $this->_out('Q');
+            [$this->FillColor, $this->bgcolor, $this->ColorFlag] = $state;
+        }
         $this->SetY(70);
-        $this->writeHTML('<h1 style="font-size:26pt;color:' . self::ACCENT . ';text-align:center;">' . s($title) .
-            '</h1><p style="font-size:13pt;text-align:center;color:#555555;">' . s($subtitle) . '</p>');
-        $this->add_attribution($attribution);
+        $this->writeHTML('<h1 style="font-size:26pt;color:' . self::ACCENT . ';text-align:center;' . $style('title') . '">' .
+            s($title) . '</h1><p style="font-size:13pt;text-align:center;color:#555555;' . $style('subtitle') . '">' .
+            s($subtitle) . '</p>');
+        $this->add_attribution($attribution, false, $style('attribution'));
         if ($summaryhtml !== '') {
             $this->Ln(6);
-            $this->writeHTML($summaryhtml);
+            $summarystyle = $style('summary');
+            $this->writeHTML($summarystyle === '' ? $summaryhtml : '<div style="' . $summarystyle . '">' . $summaryhtml . '</div>');
         }
         $this->Ln(10);
-        $this->writeHTML('<p style="font-size:9pt;text-align:center;color:#777777;">' . s($footnote) . '</p>');
+        $this->writeHTML('<p style="font-size:9pt;text-align:center;color:#777777;' . $style('date') . '">' .
+            s($footnote) . '</p>');
         // The next page starts the body; reset the flag only once the cover is finished.
         $this->endPage();
         $this->oncover = false;
@@ -138,9 +157,10 @@ class pdf_document extends \pdf {
      *
      * @param array $attribution See publication::get_attribution(); missing keys mean unknown.
      * @param bool $explicit Print unknown values as "not specified" instead of leaving them out.
+     * @param string $style Escaped inline declarations appended to the built-in style.
      */
-    public function add_attribution(array $attribution, bool $explicit = false): void {
-        $html = self::get_attribution_html($attribution, $explicit);
+    public function add_attribution(array $attribution, bool $explicit = false, string $style = ''): void {
+        $html = self::get_attribution_html($attribution, $explicit, $style);
         if ($html !== '') {
             $this->writeHTML($html);
         }
@@ -151,9 +171,10 @@ class pdf_document extends \pdf {
      *
      * @param array $attribution See add_attribution().
      * @param bool $explicit See add_attribution().
+     * @param string $style See add_attribution().
      * @return string HTML, empty when there is nothing to print.
      */
-    public static function get_attribution_html(array $attribution, bool $explicit = false): string {
+    public static function get_attribution_html(array $attribution, bool $explicit = false, string $style = ''): string {
         $authors = implode('; ', $attribution['authors'] ?? []);
         $license = $attribution['license'] ?? '';
         $url = $attribution['licenseurl'] ?? '';
@@ -170,7 +191,7 @@ class pdf_document extends \pdf {
         } else if ($license !== '' || $explicit) {
             $lines[] = $label('licenselabel') . s($license !== '' ? $license : get_string('license_none', 'block_pdfexport'));
         }
-        return '<p style="font-size:9pt;text-align:center;color:#555555;">' . implode('<br>', $lines) . '</p>';
+        return '<p style="font-size:9pt;text-align:center;color:#555555;' . $style . '">' . implode('<br>', $lines) . '</p>';
     }
 
     /**

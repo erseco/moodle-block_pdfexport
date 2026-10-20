@@ -27,8 +27,9 @@ Original idea and first implementation by **[HenarLG](https://github.com/HenarLG
   availability restrictions, groups, hidden book chapters and module capabilities.
 - **Safe conversion**: an allowlist of HTML tags and attributes, no JavaScript, no
   remote downloads; images only from the resource's own Moodle files.
-- **Teacher configuration** grouped by section, with "Select all" per section and
-  optional author attribution and content license.
+- **Teacher configuration** grouped by section, with "Select all" per section,
+  optional author attribution and content license, and an optional
+  [cover style](#course-pdf-cover-style) for the course PDF.
 - English and Spanish translations.
 
 ## Compatibility
@@ -72,8 +73,10 @@ boots Moodle 5.3 in your browser with a demo course (users `teacher_demo` and
    gets **Specific authorship and license** under its checkbox: empty authors use the
    default ones, and its license can be the default, another one or explicitly *No
    license specified*. Leave everything empty if it is not known: no license is ever
-   assigned automatically. Then **Save changes**.
-5. **Download the course PDF with the saved selection** shows what students will get.
+   assigned automatically.
+5. Optionally, under **Course PDF cover style**, type a small stylesheet in
+   **Cover CSS** (see [below](#course-pdf-cover-style)). Then **Save changes**.
+6. **Download the course PDF with the saved selection** shows what students will get.
    Hidden or restricted resources you selected are only included for users who can
    see them.
 
@@ -81,6 +84,69 @@ boots Moodle 5.3 in your browser with a demo course (users `teacher_demo` and
 
 Managing the selection requires `block/pdfexport:configure` and `moodle/course:update`
 (editing teachers and managers by default).
+
+## Course PDF cover style
+
+The **Cover CSS** field, on the **Manage downloadable resources** page, styles the
+cover of the course PDF. It never affects the table of contents, section headings,
+resource content, bookmarks, running headers and footers, page numbers or the PDFs of
+single resources. Each block has its own style. Clear the field and save to restore the
+default cover.
+
+TCPDF, the PDF engine bundled with Moodle, is not a browser: it understands only a
+small part of CSS. The field therefore accepts a strict, documented subset and rejects
+everything else with an error message, instead of silently ignoring it.
+
+| Selector | Styles |
+|---|---|
+| `.pdfexport-cover` | Every cover element below; their own selectors override it. Its `background-color` fills the cover page. |
+| `.pdfexport-cover-title` | Course full name |
+| `.pdfexport-cover-subtitle` | Course short name |
+| `.pdfexport-cover-attribution` | Default authors and license, when configured (links keep their colour) |
+| `.pdfexport-cover-summary` | Course summary (inline styles inside the summary take precedence) |
+| `.pdfexport-cover-date` | "Generated on" date |
+
+| Property | Values |
+|---|---|
+| `color`, `background-color` | `#rgb` or `#rrggbb` |
+| `font-size` | `6pt` to `72pt` |
+| `font-weight` | `normal`, `bold` |
+| `font-style` | `normal`, `italic` |
+| `text-align` | `left`, `center`, `right`, `justify` |
+| `line-height` | a number from `0.8` to `3` (multiple of the font size) |
+
+Rules can list several selectors (`a, b { … }`), later declarations win, and
+`/* comments */` are allowed. Example:
+
+```css
+/* Brand colours */
+.pdfexport-cover { background-color: #f4f8fb; }
+
+.pdfexport-cover-title {
+    color: #123456;
+    font-size: 30pt;
+    text-align: center;
+}
+
+.pdfexport-cover-subtitle {
+    color: #555555;
+    font-size: 15pt;
+}
+
+.pdfexport-cover-date {
+    color: #777777;
+    font-size: 9pt;
+}
+```
+
+Not supported: other selectors (`body`, `*`, element, id, descendant or pseudo-class
+selectors), other properties (margins, padding, borders, positioning, flexbox, grid,
+fonts, transforms, animations), named or `rgb()` colours, units other than `pt`,
+`!important`, CSS variables, functions and at-rules such as `@import`, `@font-face` or
+`@media`. Quotes, backslash escapes, `url()` and data URIs are rejected outright: an
+export never fetches remote resources or reads files, and the stylesheet can never
+inject HTML into the PDF. The stored stylesheet is validated again on every download;
+an invalid one is ignored and the default cover is used. The limit is 8 KiB.
 
 ## Student guide
 
@@ -156,7 +222,8 @@ printed and no license is assumed.
 
 - TCPDF is not a browser: complex CSS layouts, floats and positioned elements are
   simplified. JavaScript-built content (H5P, SCORM, interactive widgets) cannot be
-  printed.
+  printed. The cover CSS supports only the subset listed in
+  [Course PDF cover style](#course-pdf-cover-style).
 - PDF files published as File resources are linked, not merged into the course PDF
   (TCPDF cannot import PDF pages). An offline ZIP of original files is a possible future
   feature.

@@ -17,6 +17,7 @@
 namespace block_pdfexport;
 
 use block_pdfexport\form\selection_form;
+use block_pdfexport\local\cover_css;
 use block_pdfexport\local\publication;
 use block_pdfexport\local\resource_detector;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -32,6 +33,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
  */
 #[CoversClass(publication::class)]
 #[CoversClass(selection_form::class)]
+#[CoversClass(cover_css::class)]
 final class publication_test extends \advanced_testcase {
     /**
      * Parsing tolerates missing, tampered and legacy configuration.
@@ -232,6 +234,78 @@ final class publication_test extends \advanced_testcase {
     }
 
     /**
+     * The cover stylesheet is saved as typed, kept by selection-only saves, cleared with a blank
+     * field and independent per block; saving it keeps the selection and every other setting.
+     */
+    public function test_cover_css_configuration(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $generator = $this->getDataGenerator()->get_plugin_generator('block_pdfexport');
+        $course = $this->getDataGenerator()->create_course();
+        $record = $generator->create_course_block($course, [3, 4]);
+        $config = unserialize(base64_decode($record->configdata));
+        $config->title = 'Mine';
+        $config->authors = 'Ana';
+        $config->license = 'cc_by';
+        $config->cmattribution = [4 => ['authors' => 'Bob', 'license' => 'cc_by_sa', 'customlicense' => '', 'licenseurl' => '']];
+        $DB->set_field('block_instances', 'configdata', base64_encode(serialize($config)), ['id' => $record->id]);
+        $block = publication::get_course_block($record->id, $course->id);
+        // Legacy configuration: no stylesheet, default cover.
+        $this->assertSame('', publication::get_cover_css($block->config));
+        $this->assertSame([], publication::get_cover_styles($block->config));
+
+        $css = "/* Brand */\r\n.pdfexport-cover-title {\r\n    color: #123456;\r\n}\r\n";
+        publication::save($block, [3, 4], null, $css);
+        $reloaded = publication::get_course_block($record->id, $course->id);
+        $this->assertSame($css, publication::get_cover_css($reloaded->config));
+        $this->assertSame(['title' => ['color' => '#123456']], publication::get_cover_styles($reloaded->config));
+        $this->assertSame([3, 4], publication::get_selected_cmids($reloaded->config));
+        $this->assertSame('Mine', $reloaded->config->title);
+        $this->assertSame('CC BY 4.0', publication::get_attribution($reloaded->config)['license']);
+        $this->assertSame(['Bob'], publication::get_cm_attributions($reloaded->config)[4]['authors']);
+
+        // Updating the selection and the attribution keeps the stylesheet.
+        publication::save($reloaded, [4], publication::get_settings($reloaded->config));
+        $reloaded = publication::get_course_block($record->id, $course->id);
+        $this->assertSame([4], publication::get_selected_cmids($reloaded->config));
+        $this->assertSame($css, publication::get_cover_css($reloaded->config));
+
+        // A second block keeps its own stylesheet.
+        $course2 = $this->getDataGenerator()->create_course();
+        $other = publication::get_course_block($generator->create_course_block($course2)->id, $course2->id);
+        publication::save($other, [], null, '.pdfexport-cover-date { font-size: 8pt }');
+        publication::save($reloaded, [4], null, '.pdfexport-cover-title { color: #654321 }');
+        $this->assertSame(['title' => ['color' => '#654321']], publication::get_cover_styles(
+            publication::get_course_block($record->id, $course->id)->config
+        ));
+        $this->assertSame(['date' => ['font-size' => '8pt']], publication::get_cover_styles(
+            publication::get_course_block($other->instance->id, $course2->id)->config
+        ));
+
+        // A blank field restores the default cover.
+        publication::save($reloaded, [4], null, " \n\t");
+        $reloaded = publication::get_course_block($record->id, $course->id);
+        $this->assertSame('', $reloaded->config->covercss);
+        $this->assertSame([], publication::get_cover_styles($reloaded->config));
+        $this->assertSame([4], publication::get_selected_cmids($reloaded->config));
+    }
+
+    /**
+     * Stored stylesheets are parsed again before rendering: tampered values give the default cover.
+     */
+    public function test_get_cover_styles_untrusted(): void {
+        foreach ([null, 'string', (object)[], (object)['covercss' => ['x']], (object)['covercss' => 5]] as $config) {
+            $this->assertSame('', publication::get_cover_css($config));
+            $this->assertSame([], publication::get_cover_styles($config));
+        }
+        $tampered = (object)['covercss' => '.pdfexport-cover-title { background-image: url(https://evil.example/a.png) }'];
+        $this->assertSame([], publication::get_cover_styles($tampered));
+        $this->assertDebuggingCalled();
+        $this->assertSame([], publication::get_cover_styles((object)['covercss' => 'body { color: #000 }']));
+        $this->assertDebuggingCalled();
+    }
+
+    /**
      * Block ids are validated against the course: substitution and foreign blocks are refused.
      */
     public function test_get_course_block_validation(): void {
@@ -276,6 +350,7 @@ final class publication_test extends \advanced_testcase {
             'selected' => [(int)$book->cmid],
             'attribution' => publication::get_settings((object)['authors' => 'A. Author', 'license' => 'cc_by',
                 'cmattribution' => [$book->cmid => ['authors' => 'Book Author', 'license' => '']]]),
+            'covercss' => '.pdfexport-cover-title { color: #123456 }',
         ];
 
         $form = new selection_form(null, $customdata);
@@ -288,6 +363,10 @@ final class publication_test extends \advanced_testcase {
         $this->assertStringContainsString('A. Author', $html);
         $this->assertStringContainsString('name="cmlicense[' . $page->cmid . ']"', $html);
         $this->assertStringContainsString('Book Author', $html);
+        $this->assertMatchesRegularExpression(
+            '~<textarea[^>]+name="covercss"[^>]*>\s*\.pdfexport-cover-title \{ color: #123456 \}~',
+            $html
+        );
         $this->assertMatchesRegularExpression('~<option value="cc_by" selected~', $html);
         $this->assertMatchesRegularExpression('~type="checkbox"\s+name="cmoverride\[' . $book->cmid . '\]"[^>]*checked~', $html);
         $this->assertDoesNotMatchRegularExpression(
@@ -310,11 +389,14 @@ final class publication_test extends \advanced_testcase {
             'cmlicense' => [$page->cmid => '', $book->cmid => 'cc_by', 999999 => 'cc_by'],
             'cmcustomlicense' => [$page->cmid => '', $book->cmid => ''],
             'cmlicenseurl' => [$page->cmid => '', $book->cmid => ''],
+            'covercss' => ".pdfexport-cover-date {\r\n  color: #777;\r\n}",
         ]);
         $form = new selection_form(null, $customdata);
         $data = $form->get_data();
         $this->assertSame([(int)$page->cmid], $form->get_selected_cmids($data));
         $this->assertSame([], $form->get_selected_cmids((object)[]));
+        // Raw parameter: the stylesheet is kept exactly as typed.
+        $this->assertSame(".pdfexport-cover-date {\r\n  color: #777;\r\n}", $data->covercss);
         $this->assertSame([
             'default' => ['authors' => "Ana\nBob", 'license' => 'custom', 'customlicense' => 'Terms',
                 'licenseurl' => 'https://example.org/terms'],
@@ -334,5 +416,19 @@ final class publication_test extends \advanced_testcase {
             'cmlicenseurl' => [5 => 'ftp://example.org', 6 => 'ftp://example.org'],
         ], []);
         $this->assertSame(['cmcustomlicense[5]', 'cmlicenseurl[5]'], array_keys($errors));
+
+        // The cover stylesheet is optional and validated with a localised message.
+        $this->assertSame([], $form->validation(['license' => '', 'covercss' => ''], []));
+        $this->assertSame([], $form->validation(['license' => '', 'covercss' => '.pdfexport-cover { color: #000 }'], []));
+        $errors = $form->validation(['license' => '', 'covercss' => '@import "https://evil.example/x.css";'], []);
+        $this->assertSame(['covercss' => get_string('covercsscharacters', 'block_pdfexport')], $errors);
+        $errors = $form->validation(['license' => '', 'covercss' => '.pdfexport-cover-title { position: absolute }'], []);
+        $this->assertSame(['covercss' => get_string('covercssproperty', 'block_pdfexport', 'position')], $errors);
+
+        // Without candidates the attribution and cover style can still be prepared.
+        $html = (new selection_form(null, ['sections' => [], 'selected' => []]))->render();
+        $this->assertStringContainsString('name="covercss"', $html);
+        $this->assertStringContainsString('name="authors"', $html);
+        $this->assertStringNotContainsString('name="selectall"', $html);
     }
 }
