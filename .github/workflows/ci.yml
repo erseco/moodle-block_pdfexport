@@ -117,7 +117,7 @@ jobs:
         # can exceed Behat's default 10 s wait on GitHub runners.
         run: |
           # shellcheck disable=SC2016 # literal PHP, not a shell expansion
-          moodle-plugin-ci add-config -- '$CFG->behat_increasetimeout = 3;'
+          moodle-plugin-ci add-config -- '$CFG->behat_increasetimeout = 10;'
 
       - name: PHP Lint
         if: ${{ !cancelled() }}
@@ -171,28 +171,6 @@ jobs:
       - name: Behat features
         if: ${{ !cancelled() }}
         run: moodle-plugin-ci behat --profile chrome --dump
-
-      - name: Diagnose Behat JavaScript (temporary)
-        if: ${{ failure() && matrix.coverage }}
-        working-directory: moodle
-        continue-on-error: true
-        run: |
-          php -S localhost:8000 -t public > /tmp/phpserver.log 2>&1 &
-          docker run -d --rm --name diagsel --network=host --shm-size=2g selenium/standalone-chrome:4 > /dev/null
-          for i in $(seq 1 30); do curl -sf localhost:4444/status > /dev/null && break; sleep 2; done
-          SID=$(curl -s -X POST localhost:4444/session -H 'Content-Type: application/json' \
-            -d '{"capabilities":{"alwaysMatch":{"browserName":"chrome","goog:loggingPrefs":{"browser":"ALL"}}}}' | jq -r .value.sessionId)
-          for page in /login/index.php /; do
-            echo "== $page"
-            curl -s -X POST "localhost:4444/session/$SID/url" -H 'Content-Type: application/json' -d "{\"url\":\"http://localhost:8000$page\"}" > /dev/null
-            sleep 20
-            curl -s -X POST "localhost:4444/session/$SID/execute/sync" -H 'Content-Type: application/json' \
-              -d '{"script":"return JSON.stringify({url: location.href, ready: document.readyState, pending: (window.M && M.util && M.util.pending_js) || null});","args":[]}' | jq -r .value
-            curl -s -X POST "localhost:4444/session/$SID/se/log" -H 'Content-Type: application/json' -d '{"type":"browser"}' \
-              | jq -r '.value[] | "\(.level) \(.message)"' | cut -c1-400 | head -30
-          done
-          echo "== server non-200"; grep -v ' \[200\]\|Accepted\|Closing' /tmp/phpserver.log | tail -30
-          docker stop diagsel > /dev/null
 
       - name: Mark cancelled jobs as failed
         if: ${{ cancelled() }}
