@@ -48,26 +48,32 @@ $PAGE->set_heading(format_string($course->fullname, true, ['context' => $context
 $sections = resource_detector::get_sections(get_fast_modinfo($course), false);
 $form = new selection_form($url, ['sections' => $sections,
     'selected' => publication::get_selected_cmids($block->config),
-    'attribution' => publication::get_settings($block->config)]);
+    'attribution' => publication::get_settings($block->config),
+    'covercss' => publication::get_cover_css($block->config)]);
 if ($form->is_cancelled()) {
     redirect($courseurl);
 } else if ($data = $form->get_data()) {
-    publication::save($block, $form->get_selected_cmids($data), $form->get_attribution_settings($data));
+    publication::save(
+        $block,
+        $form->get_selected_cmids($data),
+        $form->get_attribution_settings($data),
+        $data->covercss ?? ''
+    );
     redirect($courseurl, get_string('changessaved'), null, \core\output\notification::NOTIFY_SUCCESS);
 }
 
 echo $OUTPUT->header();
 echo $OUTPUT->heading(get_string('manageresources', 'block_pdfexport'));
 echo html_writer::tag('p', get_string('selectiondescription', 'block_pdfexport'));
-if ($sections) {
-    $form->display();
-    if (publication::get_selected_cmids($block->config)) {
-        echo html_writer::link(new moodle_url(
-            '/blocks/pdfexport/download.php',
-            ['courseid' => $course->id, 'blockid' => $blockid]
-        ), get_string('coursepdfpreview', 'block_pdfexport'));
-    }
-} else {
+if (!$sections) {
     echo $OUTPUT->notification(get_string('nocandidates', 'block_pdfexport'), 'info');
+}
+// Shown even without candidates: the attribution and the cover style can be prepared in advance.
+$form->display();
+if ($sections && publication::get_selected_cmids($block->config)) {
+    echo html_writer::link(new moodle_url(
+        '/blocks/pdfexport/download.php',
+        ['courseid' => $course->id, 'blockid' => $blockid]
+    ), get_string('coursepdfpreview', 'block_pdfexport'));
 }
 echo $OUTPUT->footer();

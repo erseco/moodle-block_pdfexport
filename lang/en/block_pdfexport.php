@@ -37,6 +37,23 @@ $string['cmlicenseurl'] = '{$a}: license URL (optional)';
 $string['contents'] = 'Contents';
 $string['conversionwarnings'] = 'Conversion warnings';
 $string['coursepdfpreview'] = 'Download the course PDF with the saved selection';
+$string['covercss'] = 'Cover CSS';
+$string['covercss_help'] = 'Optional styles for the cover of the course PDF only. The table of contents, the content and the PDFs of single resources are never affected. Clear the field to restore the default cover.
+
+Selectors: .pdfexport-cover (every cover element; its background colour fills the cover page), .pdfexport-cover-title, .pdfexport-cover-subtitle, .pdfexport-cover-attribution, .pdfexport-cover-summary, .pdfexport-cover-date.
+
+Properties: color and background-color (#rgb or #rrggbb), font-size (6pt to 72pt), font-weight (normal, bold), font-style (normal, italic), text-align (left, center, right, justify), line-height (0.8 to 3).
+
+Example: .pdfexport-cover-title { color: #123456; font-size: 30pt; }
+
+The PDF engine supports only this subset: URLs, imports, fonts, images, functions and other CSS are rejected.';
+$string['covercsscharacters'] = 'The cover CSS contains characters that are not allowed. Use only letters, digits, spaces and the symbols # . , : ; { } - (comments are allowed). URLs, quotes, escapes, functions such as url() and at-rules such as @import are not supported.';
+$string['covercssproperty'] = 'The property "{$a}" is not supported in the cover CSS.';
+$string['covercssselector'] = 'The selector "{$a}" is not supported in the cover CSS. Use only the documented .pdfexport-cover selectors.';
+$string['covercsssyntax'] = 'The cover CSS is malformed: write each rule as selectors followed by "property: value;" declarations between { and }, without nesting.';
+$string['covercsstoolong'] = 'The cover CSS cannot be longer than {$a} bytes.';
+$string['covercssvalue'] = 'The value "{$a->value}" is not supported for the property {$a->property} in the cover CSS.';
+$string['coverstyle'] = 'Course PDF cover style';
 $string['customlicense'] = 'Custom license name';
 $string['customlicenserequired'] = 'Enter a name for the custom license.';
 $string['downloadcoursepdf'] = 'Download course PDF';

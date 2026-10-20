@@ -23,7 +23,8 @@ namespace block_pdfexport\local;
  * format used since the first alpha release, so existing instances keep their selection.
  * Attribution is optional: the default in "authors", "license", "customlicense" and
  * "licenseurl", and resource overrides in "cmattribution" (keyed by course module id).
- * No license is ever assumed: an empty configuration prints no attribution.
+ * No license is ever assumed: an empty configuration prints no attribution. The optional
+ * course PDF cover stylesheet is kept as typed in "covercss" and parsed by cover_css.
  *
  * @package    block_pdfexport
  * @copyright  2026 HenarLG and block_pdfexport contributors
@@ -121,14 +122,43 @@ final class publication {
     }
 
     /**
-     * Stores a new selection and, optionally, new attribution settings, keeping any other
-     * configuration properties.
+     * Returns the stored cover stylesheet as typed, or an empty string.
+     *
+     * @param mixed $config Block config, possibly null or tampered with.
+     * @return string
+     */
+    public static function get_cover_css($config): string {
+        return is_object($config) && isset($config->covercss) && is_string($config->covercss) ? $config->covercss : '';
+    }
+
+    /**
+     * Returns the validated cover styles of a block configuration.
+     *
+     * The stored stylesheet is parsed again on every export: block configuration is not trusted.
+     * An invalid stylesheet is ignored, so the PDF keeps the default cover.
+     *
+     * @param mixed $config Block config, possibly null or tampered with.
+     * @return array[] See cover_css::parse(); empty for the default cover.
+     */
+    public static function get_cover_styles($config): array {
+        try {
+            return cover_css::parse(self::get_cover_css($config));
+        } catch (\moodle_exception $e) {
+            debugging('block_pdfexport: ignoring invalid cover CSS: ' . $e->getMessage(), DEBUG_DEVELOPER);
+            return [];
+        }
+    }
+
+    /**
+     * Stores a new selection and, optionally, new attribution settings and cover stylesheet,
+     * keeping any other configuration properties.
      *
      * @param \block_base $block Block instance.
      * @param int[] $cmids Course module ids, already validated against the course.
      * @param array|null $settings Attribution settings shaped as get_settings(); null keeps the stored ones.
+     * @param string|null $covercss Cover stylesheet, already validated with cover_css::parse(); null keeps the stored one.
      */
-    public static function save(\block_base $block, array $cmids, ?array $settings = null): void {
+    public static function save(\block_base $block, array $cmids, ?array $settings = null, ?string $covercss = null): void {
         $config = is_object($block->config) ? clone $block->config : new \stdClass();
         $config->selectedcmids = implode(',', self::get_selected_cmids((object)['selectedcmids' => implode(',', $cmids)]));
         if ($settings !== null) {
@@ -136,6 +166,10 @@ final class publication {
                 $config->$key = $value;
             }
             $config->cmattribution = self::get_settings((object)['cmattribution' => $settings['cms'] ?? []])['cms'];
+        }
+        if ($covercss !== null) {
+            // Kept as typed, so teachers find their own formatting; a blank field restores the default cover.
+            $config->covercss = trim($covercss) === '' ? '' : $covercss;
         }
         $block->instance_config_save($config);
         $block->config = $config;

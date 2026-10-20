@@ -37,6 +37,23 @@ $string['cmlicenseurl'] = '{$a}: URL de la licencia (opcional)';
 $string['contents'] = 'Índice';
 $string['conversionwarnings'] = 'Advertencias de conversión';
 $string['coursepdfpreview'] = 'Descargar el PDF del curso con la selección guardada';
+$string['covercss'] = 'CSS de la portada';
+$string['covercss_help'] = 'Estilos opcionales solo para la portada del PDF del curso. Nunca afectan al índice, al contenido ni a los PDF de recursos individuales. Vacía el campo para recuperar la portada predeterminada.
+
+Selectores: .pdfexport-cover (todos los elementos de la portada; su color de fondo rellena la página de portada), .pdfexport-cover-title, .pdfexport-cover-subtitle, .pdfexport-cover-attribution, .pdfexport-cover-summary, .pdfexport-cover-date.
+
+Propiedades: color y background-color (#rgb o #rrggbb), font-size (de 6pt a 72pt), font-weight (normal, bold), font-style (normal, italic), text-align (left, center, right, justify), line-height (de 0.8 a 3).
+
+Ejemplo: .pdfexport-cover-title { color: #123456; font-size: 30pt; }
+
+El motor de PDF solo admite este subconjunto: se rechazan URL, importaciones, fuentes, imágenes, funciones y cualquier otro CSS.';
+$string['covercsscharacters'] = 'El CSS de la portada contiene caracteres no permitidos. Usa solo letras, dígitos, espacios y los símbolos # . , : ; { } - (se admiten comentarios). No se admiten URL, comillas, secuencias de escape, funciones como url() ni reglas @ como @import.';
+$string['covercssproperty'] = 'La propiedad "{$a}" no está admitida en el CSS de la portada.';
+$string['covercssselector'] = 'El selector "{$a}" no está admitido en el CSS de la portada. Usa solo los selectores .pdfexport-cover documentados.';
+$string['covercsssyntax'] = 'El CSS de la portada está mal formado: escribe cada regla como selectores seguidos de declaraciones "propiedad: valor;" entre { y }, sin anidar.';
+$string['covercsstoolong'] = 'El CSS de la portada no puede superar los {$a} bytes.';
+$string['covercssvalue'] = 'El valor "{$a->value}" no está admitido para la propiedad {$a->property} en el CSS de la portada.';
+$string['coverstyle'] = 'Estilo de la portada del PDF del curso';
 $string['customlicense'] = 'Nombre de la licencia personalizada';
 $string['customlicenserequired'] = 'Escribe un nombre para la licencia personalizada.';
 $string['downloadcoursepdf'] = 'Descargar PDF del curso';

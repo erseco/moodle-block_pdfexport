@@ -42,7 +42,8 @@ $service = new export_service(
     $course,
     publication::get_selected_cmids($block->config),
     attribution: publication::get_attribution($block->config),
-    cmattributions: publication::get_cm_attributions($block->config)
+    cmattributions: publication::get_cm_attributions($block->config),
+    coverstyles: publication::get_cover_styles($block->config)
 );
 $document = $cmid ? $service->build_module_document($cmid) : $service->build_course_document();
 // The whole PDF is produced before any header is sent, so errors never yield a corrupt download.

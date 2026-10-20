@@ -52,6 +52,9 @@ final class export_service {
     /** @var array[] Attribution of the resources that override the default, keyed by course module id. */
     private array $cmattributions;
 
+    /** @var array[] Validated course PDF cover styles, see cover_css::parse(). */
+    private array $coverstyles;
+
     /**
      * Constructor.
      *
@@ -61,6 +64,7 @@ final class export_service {
      * @param int $maxresources Maximum number of resources in a course PDF.
      * @param array $attribution Default attribution, see publication::get_attribution().
      * @param array[] $cmattributions Resource attribution by course module id, see publication::get_cm_attributions().
+     * @param array[] $coverstyles Course PDF cover styles, see publication::get_cover_styles().
      */
     public function __construct(
         \stdClass $course,
@@ -68,7 +72,8 @@ final class export_service {
         ?print_transformer $transformer = null,
         int $maxresources = self::MAX_RESOURCES,
         array $attribution = [],
-        array $cmattributions = []
+        array $cmattributions = [],
+        array $coverstyles = []
     ) {
         $this->course = $course;
         $this->selected = $selected;
@@ -76,6 +81,7 @@ final class export_service {
         $this->maxresources = $maxresources;
         $this->attribution = $attribution;
         $this->cmattributions = $cmattributions;
+        $this->coverstyles = $coverstyles;
     }
 
     /**
@@ -203,7 +209,8 @@ final class export_service {
                 $document['subtitle'],
                 $document['summary'],
                 get_string('generatedon', 'block_pdfexport', userdate(time())),
-                $attribution
+                $attribution,
+                $this->coverstyles
             );
         }
         foreach ($document['sections'] as $section) {

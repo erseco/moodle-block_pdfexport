@@ -27,7 +27,7 @@ require_once($CFG->dirroot . '/backup/util/includes/restore_includes.php');
 require_once($CFG->dirroot . '/blocks/pdfexport/backup/moodle2/restore_pdfexport_block_task.class.php');
 
 /**
- * Tests that course backup and restore keep the published selection and attribution.
+ * Tests that course backup and restore keep the published selection, attribution and cover CSS.
  *
  * @package    block_pdfexport
  * @category   test
@@ -57,6 +57,7 @@ final class backup_restore_test extends \advanced_testcase {
         $config = unserialize(base64_decode($record->configdata));
         $config->authors = "Ana\nBob";
         $config->license = 'cc_by';
+        $config->covercss = ".pdfexport-cover-title {\n    color: #123456;\n}";
         $config->cmattribution = [
             $book->cmid => ['authors' => 'Book Author', 'license' => 'custom', 'customlicense' => 'House',
                 'licenseurl' => 'https://example.org/house'],
@@ -109,5 +110,6 @@ final class backup_restore_test extends \advanced_testcase {
             'Restored book' => ['authors' => ['Book Author'], 'license' => 'House', 'licenseurl' => 'https://example.org/house'],
             'Restored page' => ['authors' => ['Ana', 'Bob'], 'license' => '', 'licenseurl' => ''],
         ], $overrides);
+        $this->assertSame(".pdfexport-cover-title {\n    color: #123456;\n}", publication::get_cover_css($block->config));
     }
 }
