@@ -25,8 +25,8 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'block_pdfexport';
-$plugin->version = 2026102003;
+$plugin->version = 2026102004;
 $plugin->requires = 2026100200;
 $plugin->supported = [503, 503];
 $plugin->maturity = MATURITY_BETA;
-$plugin->release = '0.4.0';
+$plugin->release = 'dev';
