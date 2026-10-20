@@ -175,20 +175,24 @@ jobs:
       - name: Diagnose Behat JavaScript (temporary)
         if: ${{ failure() && matrix.coverage }}
         working-directory: moodle
+        continue-on-error: true
         run: |
           php -S localhost:8000 -t public > /tmp/phpserver.log 2>&1 &
-          sleep 2
-          curl -sL -c /tmp/c -b /tmp/c http://localhost:8000/login/index.php -o /tmp/login.html
-          echo "== PHP messages in page"; grep -iE 'Deprecated|Warning:|Notice:|Fatal|debuggingmessage' /tmp/login.html | head -10 || true
-          echo "== importmap"; python3 -c "import re,sys;h=open('/tmp/login.html').read();m=re.search(r'<script type=\"importmap\"[^>]*>(.*?)</script>',h,re.S);print(m.group(1)[:3000] if m else 'none')"
-          echo "== script URLs"
-          for url in $(grep -oE 'http://localhost:8000[^"]*\.(js|php)[^"]*' /tmp/login.html | sort -u | head -30) $(python3 -c "import re,json;h=open('/tmp/login.html').read();m=re.search(r'<script type=\"importmap\"[^>]*>(.*?)</script>',h,re.S);d=json.loads(m.group(1)) if m else {};print(' '.join(list(d.get('imports',{}).values())[:40]))"); do
-            code=$(curl -s -b /tmp/c -o /tmp/r -w '%{http_code} %{content_type}' "$url")
-            bad=$(grep -ciE 'Deprecated|Warning:|Notice:|Fatal|Stack trace' /tmp/r || true)
-            echo "$code php_msgs=$bad $url"
-            [ "$bad" = "0" ] || grep -iE 'Deprecated|Warning:|Notice:|Fatal' /tmp/r | head -3
+          docker run -d --rm --name diagsel --network=host --shm-size=2g selenium/standalone-chrome:4 > /dev/null
+          for i in $(seq 1 30); do curl -sf localhost:4444/status > /dev/null && break; sleep 2; done
+          SID=$(curl -s -X POST localhost:4444/session -H 'Content-Type: application/json' \
+            -d '{"capabilities":{"alwaysMatch":{"browserName":"chrome","goog:loggingPrefs":{"browser":"ALL"}}}}' | jq -r .value.sessionId)
+          for page in /login/index.php /; do
+            echo "== $page"
+            curl -s -X POST "localhost:4444/session/$SID/url" -H 'Content-Type: application/json' -d "{\"url\":\"http://localhost:8000$page\"}" > /dev/null
+            sleep 20
+            curl -s -X POST "localhost:4444/session/$SID/execute/sync" -H 'Content-Type: application/json' \
+              -d '{"script":"return JSON.stringify({url: location.href, ready: document.readyState, pending: (window.M && M.util && M.util.pending_js) || null});","args":[]}' | jq -r .value
+            curl -s -X POST "localhost:4444/session/$SID/se/log" -H 'Content-Type: application/json' -d '{"type":"browser"}' \
+              | jq -r '.value[] | "\(.level) \(.message)"' | cut -c1-400 | head -30
           done
-          echo "== server log"; grep -v ' \[200\]\|Accepted\|Closing' /tmp/phpserver.log | tail -40 || true
+          echo "== server non-200"; grep -v ' \[200\]\|Accepted\|Closing' /tmp/phpserver.log | tail -30
+          docker stop diagsel > /dev/null
 
       - name: Mark cancelled jobs as failed
         if: ${{ cancelled() }}
