@@ -8,16 +8,25 @@
 //
 // Moodle is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with Moodle. If not, see <https://www.gnu.org/licenses/>.
+// along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
+
+/**
+ * Version information for block_pdfexport.
+ *
+ * @package    block_pdfexport
+ * @copyright  2026 HenarLG and block_pdfexport contributors
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
 
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'block_pdfexport';
-$plugin->version = 2026100901;
+$plugin->version = 2026102000;
 $plugin->requires = 2026100200;
-$plugin->maturity = MATURITY_ALPHA;
-$plugin->release = '0.3.2-alpha';
+$plugin->supported = [503, 503];
+$plugin->maturity = MATURITY_BETA;
+$plugin->release = 'dev';

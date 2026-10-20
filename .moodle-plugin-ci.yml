@@ -1,0 +1,7 @@
+# moodle-plugin-ci configuration: paths excluded from the code-analysis commands
+# (phplint, phpcs, phpdoc, phpmd, mustache). vendor/ only exists in local
+# checkouts after `composer install` (moodle-cs); CI checkouts never have it.
+filter:
+  notPaths:
+    - vendor
+    - node_modules

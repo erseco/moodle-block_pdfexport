@@ -8,27 +8,62 @@
 //
 // Moodle is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with Moodle. If not, see <https://www.gnu.org/licenses/>.
+// along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
-defined('MOODLE_INTERNAL') || die();
+/**
+ * PDF Export block: lists the published course resources and links to their PDF exports.
+ *
+ * @package    block_pdfexport
+ * @copyright  2026 HenarLG and block_pdfexport contributors
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
 
+use block_pdfexport\local\adapters\base_adapter;
+use block_pdfexport\local\export_service;
+use block_pdfexport\local\publication;
+
+/**
+ * PDF Export block class.
+ *
+ * @package    block_pdfexport
+ * @copyright  2026 HenarLG and block_pdfexport contributors
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
 class block_pdfexport extends block_base {
+    /**
+     * Initialises the block title.
+     */
     public function init() {
         $this->title = get_string('pluginname', 'block_pdfexport');
     }
 
+    /**
+     * The block is only meaningful on course pages.
+     *
+     * @return array
+     */
     public function applicable_formats() {
         return ['course-view' => true, 'site-index' => false, 'my' => false];
     }
 
+    /**
+     * One block per course is enough.
+     *
+     * @return bool
+     */
     public function instance_allow_multiple() {
         return false;
     }
 
+    /**
+     * Builds the block content for the current user.
+     *
+     * @return stdClass
+     */
     public function get_content() {
         global $OUTPUT;
         if ($this->content !== null) {
@@ -36,45 +71,46 @@ class block_pdfexport extends block_base {
         }
         $this->content = (object)['text' => '', 'footer' => ''];
         $course = $this->page->course;
-        if (!$course || empty($course->id) || (int)$course->id === SITEID) {
+        if (empty($course->id) || (int)$course->id === SITEID) {
             return $this->content;
         }
         $context = context_course::instance($course->id);
         $canconfigure = has_capability('block/pdfexport:configure', $context)
             && has_capability('moodle/course:update', $context);
-        $canview = has_capability('block/pdfexport:view', $context);
-        if (!$canconfigure && !$canview) {
+        if (!has_capability('block/pdfexport:view', $context) && !$canconfigure) {
             return $this->content;
         }
-        $chosen = array_filter(array_map('intval', explode(',', $this->config->selectedcmids ?? '')));
-        $chosen = array_fill_keys($chosen, true);
-        $resources = \block_pdfexport\local\resource_detector::get_resources($course->id);
-        $list = [];
-        foreach ($resources as $resource) {
-            if (!isset($chosen[$resource['cmid']]) || !$resource['uservisible']) {
-                continue;
+        $service = new export_service($course, publication::get_selected_cmids($this->config));
+        $params = ['courseid' => $course->id, 'blockid' => $this->instance->id];
+        $sections = [];
+        foreach ($service->get_available_sections() as $section) {
+            $items = [];
+            foreach ($section['cms'] as $cm) {
+                $support = base_adapter::for_module($cm->modname)->get_support_level();
+                $name = $cm->get_formatted_name(['escape' => false]);
+                $items[] = [
+                    'name' => $name,
+                    'pdflabel' => get_string('downloadpdfof', 'block_pdfexport', $name),
+                    'url' => $cm->url ? $cm->url->out(false) : null,
+                    'iconurl' => $cm->get_icon_url()->out(false),
+                    'pdfurl' => $support === base_adapter::SUPPORT_REFERENCE ? null :
+                        (new moodle_url('/blocks/pdfexport/download.php', $params + ['cmid' => $cm->id]))->out(false),
+                    'support' => get_string('support_' . $support, 'block_pdfexport'),
+                    'isreference' => $support === base_adapter::SUPPORT_REFERENCE,
+                ];
             }
-            $cm = get_fast_modinfo($course)->get_cm($resource['cmid']);
-            $url = $cm->url ? $cm->url->out(false) : null;
-            if ($url) {
-                $pdfurl = new moodle_url('/blocks/pdfexport/download.php',
-                    ['courseid' => $course->id, 'blockid' => $this->instance->id, 'cmid' => $resource['cmid']]);
-                $link = html_writer::link($url, format_string($resource['name']),
-                    ['title' => get_string('openoriginal', 'block_pdfexport')]);
-                $link .= ' — ' . html_writer::link($pdfurl, get_string('downloadpdf', 'block_pdfexport'));
-                $list[] = html_writer::tag('li', $link);
-            }
+            $sections[] = ['name' => $section['name'], 'items' => $items];
         }
-        if ($list && $canview) {
-            $this->content->text = html_writer::tag('p', get_string('pdfexperimental', 'block_pdfexport'));
-            $this->content->text .= html_writer::tag('ul', implode('', $list));
-        } else if ($canview) {
-            $this->content->text = html_writer::tag('p', get_string('noresources', 'block_pdfexport'));
-        }
+        $this->content->text = $OUTPUT->render_from_template('block_pdfexport/content', [
+            'hassections' => !empty($sections),
+            'sections' => $sections,
+            'coursepdfurl' => (new moodle_url('/blocks/pdfexport/download.php', $params))->out(false),
+        ]);
         if ($canconfigure) {
-            $url = new moodle_url('/blocks/pdfexport/manage.php',
-                ['courseid' => $course->id, 'blockid' => $this->instance->id]);
-            $this->content->footer = html_writer::link($url, get_string('manageresources', 'block_pdfexport'));
+            $this->content->footer = html_writer::link(
+                new moodle_url('/blocks/pdfexport/manage.php', $params),
+                get_string('manageresources', 'block_pdfexport')
+            );
         }
         return $this->content;
     }

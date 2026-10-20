@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<ruleset name="block_pdfexport">
+    <description>Moodle coding standard for block_pdfexport.</description>
+    <file>.</file>
+    <arg name="extensions" value="php"/>
+    <rule ref="moodle"/>
+    <exclude-pattern>*/vendor/*</exclude-pattern>
+    <exclude-pattern>*/node_modules/*</exclude-pattern>
+</ruleset>
