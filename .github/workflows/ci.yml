@@ -178,15 +178,17 @@ jobs:
         run: |
           php -S localhost:8000 -t public > /tmp/phpserver.log 2>&1 &
           sleep 2
-          curl -s -c /tmp/c -b /tmp/c http://localhost:8000/ -o /tmp/home.html
-          grep -oE '(src|href)="http://localhost:8000[^"]*\.(js|php)[^"]*"' /tmp/home.html | head -40 || true
-          grep -iE 'Deprecated|Warning|Notice|Fatal|debugging|exception' /tmp/home.html | head -20 || true
-          for url in $(grep -oE 'http://localhost:8000/(lib/javascript.php|lib/requirejs.php|theme/yui_combo.php|r.php)[^"]*' /tmp/home.html | sort -u | head -20); do
-            echo "== $url"
-            curl -s -b /tmp/c "$url" | grep -iE 'Deprecated|Warning|Notice|Fatal|<b>|Stack trace|exception' | head -5 || true
+          curl -sL -c /tmp/c -b /tmp/c http://localhost:8000/login/index.php -o /tmp/login.html
+          echo "== PHP messages in page"; grep -iE 'Deprecated|Warning:|Notice:|Fatal|debuggingmessage' /tmp/login.html | head -10 || true
+          echo "== importmap"; python3 -c "import re,sys;h=open('/tmp/login.html').read();m=re.search(r'<script type=\"importmap\"[^>]*>(.*?)</script>',h,re.S);print(m.group(1)[:3000] if m else 'none')"
+          echo "== script URLs"
+          for url in $(grep -oE 'http://localhost:8000[^"]*\.(js|php)[^"]*' /tmp/login.html | sort -u | head -30) $(python3 -c "import re,json;h=open('/tmp/login.html').read();m=re.search(r'<script type=\"importmap\"[^>]*>(.*?)</script>',h,re.S);d=json.loads(m.group(1)) if m else {};print(' '.join(list(d.get('imports',{}).values())[:40]))"); do
+            code=$(curl -s -b /tmp/c -o /tmp/r -w '%{http_code} %{content_type}' "$url")
+            bad=$(grep -ciE 'Deprecated|Warning:|Notice:|Fatal|Stack trace' /tmp/r || true)
+            echo "$code php_msgs=$bad $url"
+            [ "$bad" = "0" ] || grep -iE 'Deprecated|Warning:|Notice:|Fatal' /tmp/r | head -3
           done
-          grep -oE '"[a-z_]+/[a-zA-Z_/]+"' /tmp/home.html | sort -u | head -60 || true
-          cat /tmp/phpserver.log | grep -v ' \[200\]' | tail -30 || true
+          echo "== server log"; grep -v ' \[200\]\|Accepted\|Closing' /tmp/phpserver.log | tail -40 || true
 
       - name: Mark cancelled jobs as failed
         if: ${{ cancelled() }}
