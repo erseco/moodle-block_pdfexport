@@ -6,8 +6,6 @@
   },
   "landingPage": "/course/view.php?name=PDFDEMO",
   "constants": {
-    "REPO": "erseco/moodle-block_pdfexport",
-    "REF": "main",
     "ADMIN_USER": "admin",
     "ADMIN_PASS": "password",
     "ADMIN_EMAIL": "admin@example.com",
@@ -39,7 +37,8 @@
       "pluginType": "block",
       "pluginName": "pdfexport",
       "critical": true,
-      "url": "https://github.com/{{REPO}}/archive/refs/heads/{{REF}}.zip"
+      "url": "https://github.com/erseco/moodle-block_pdfexport/archive/refs/heads/main.zip",
+      "comment": "Literal URL so the PR preview action can point it at the PR branch."
     },
     {
       "step": "installMoodlePlugin",
